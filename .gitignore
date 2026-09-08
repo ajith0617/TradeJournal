@@ -1,0 +1,194 @@
+# =============================================================================
+# TradeJournal — .gitignore
+# Optimized for GitHub: clone → npm install → run android/ios
+# Keep source, lockfiles, and debug keystore; ignore builds, secrets, IDE noise
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Dependencies
+# -----------------------------------------------------------------------------
+node_modules/
+jspm_packages/
+.pnpm-store/
+.npm/
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+# Uncomment if you use Zero-Installs and want to commit .yarn/cache
+# !.yarn/cache
+
+# -----------------------------------------------------------------------------
+# Logs & debug
+# -----------------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.metro-health-check*
+*.jsbundle
+
+# -----------------------------------------------------------------------------
+# Testing & coverage
+# -----------------------------------------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+junit.xml
+
+# -----------------------------------------------------------------------------
+# Environment & secrets (never commit real credentials)
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+**/secrets/
+**/secret/
+
+# -----------------------------------------------------------------------------
+# OS
+# -----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# -----------------------------------------------------------------------------
+# Editors & IDEs
+# -----------------------------------------------------------------------------
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Cursor / local AI tooling (optional local state)
+.cursor/
+.codex/
+.claude/
+
+# -----------------------------------------------------------------------------
+# React Native / Metro / Watchman
+# -----------------------------------------------------------------------------
+.expo/
+.expo-shared/
+*.expo.*
+web-build/
+dist/
+.tmp/
+.cache/
+.watchman-cookie-*
+
+# -----------------------------------------------------------------------------
+# Android
+# -----------------------------------------------------------------------------
+android/app/build/
+android/build/
+android/.gradle/
+android/captures/
+android/local.properties
+android/.cxx/
+android/app/.cxx/
+**/.cxx/
+android/**/ExternalNativeBuild/
+*.hprof
+.kotlin/
+
+# Release / upload keystores (keep debug.keystore for easy first run)
+*.jks
+*.keystore
+!android/app/debug.keystore
+!debug.keystore
+
+# -----------------------------------------------------------------------------
+# Xcode / iOS
+# -----------------------------------------------------------------------------
+build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+*.hmap
+**/xcuserdata/
+**/*.xcworkspace/xcuserdata/
+**/.xcode.env.local
+ios/Pods/
+ios/build/
+ios/Pods/
+**/Pods/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# -----------------------------------------------------------------------------
+# Ruby / CocoaPods / Bundler
+# -----------------------------------------------------------------------------
+/vendor/bundle/
+.bundle/vendor/
+*.gem
+Gemfile.lock.bak
+
+# -----------------------------------------------------------------------------
+# Fastlane
+# -----------------------------------------------------------------------------
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots/
+**/fastlane/test_output/
+**/fastlane/.env
+**/fastlane/.env.*
+
+# -----------------------------------------------------------------------------
+# Gradle (root-level)
+# -----------------------------------------------------------------------------
+.gradle/
+
+# -----------------------------------------------------------------------------
+# Misc generated / local
+# -----------------------------------------------------------------------------
+*.orig
+*.bak
+*.tmp
+*.temp
+.turbo/
+.parcel-cache/
+storybook-static/
+
+# Local app dumps / backups someone might generate while developing
+*.sqlite
+*.db
+/backup/
+/backups/
+/journal-data.json
