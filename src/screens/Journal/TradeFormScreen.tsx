@@ -7,7 +7,11 @@ import {
   View,
 } from 'react-native';
 import {launchImageLibrary} from 'react-native-image-picker';
-import {persistTradeImages, tradeImageFileName} from '../../services/tradeImages';
+import {
+  deleteTradeImages,
+  persistTradeImages,
+  tradeImageFileName,
+} from '../../services/tradeImages';
 import {ScreenshotGallery} from '../../components/ScreenshotGallery';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {SafeScreen} from '../../components/SafeScreen';
@@ -24,7 +28,11 @@ import {
   type ColorPalette,
 } from '../../theme';
 import type {Direction, Emotion, Segment} from '../../types';
-import {conditionWeightLabel} from '../../types';
+import {
+  conditionWeightLabel,
+  conditionWeightMarks,
+  scoreTradeConditions,
+} from '../../types';
 import {todayISO} from '../../utils/format';
 import type {JournalStackParamList} from '../../navigation/types';
 
@@ -50,6 +58,7 @@ export function TradeFormScreen({navigation, route}: Props) {
   const strategies = useJournalStore(s => s.strategies);
   const addTrade = useJournalStore(s => s.addTrade);
   const updateTrade = useJournalStore(s => s.updateTrade);
+  const removeTradeImage = useJournalStore(s => s.removeTradeImage);
 
   const [date, setDate] = useState(existing?.date ?? todayISO());
   const [stockName, setStockName] = useState(existing?.stockName ?? '');
@@ -87,6 +96,16 @@ export function TradeFormScreen({navigation, route}: Props) {
     setImages((existing?.images ?? []).map(tradeImageFileName));
   }, [existing?.id]);
   const selectedStrategy = strategies.find(s => s.id === strategyId);
+
+  const conditionMarks = useMemo(() => {
+    if (!selectedStrategy?.conditions.length) {
+      return {score: 0, max: 0};
+    }
+    return scoreTradeConditions(
+      selectedStrategy.conditions,
+      reasonConditionIds,
+    );
+  }, [selectedStrategy, reasonConditionIds]);
 
   const canSave = useMemo(() => {
     const name = stockName.trim();
@@ -135,7 +154,15 @@ export function TradeFormScreen({navigation, route}: Props) {
   };
 
   const removeImage = (uri: string) => {
-    setImages(prev => prev.filter(i => i !== uri));
+    const name = tradeImageFileName(uri);
+    setImages(prev => prev.filter(i => tradeImageFileName(i) !== name));
+
+    // Instantly remove from app storage + Download/Journal/images
+    if (existing) {
+      removeTradeImage(existing.id, name);
+    } else {
+      void deleteTradeImages([name]);
+    }
   };
 
   const onSave = () => {
@@ -159,6 +186,8 @@ export function TradeFormScreen({navigation, route}: Props) {
       targetPrice: tp != null && !Number.isNaN(tp) ? tp : undefined,
       reasonConditionIds,
       strategyId,
+      conditionScore: conditionMarks.score,
+      conditionScoreMax: conditionMarks.max,
       emotion,
       notes: notes.trim(),
       images: images.map(tradeImageFileName),
@@ -182,7 +211,7 @@ export function TradeFormScreen({navigation, route}: Props) {
   };
 
   return (
-    <SafeScreen>
+    <SafeScreen keyboardAvoiding>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()}>
           <Text style={styles.back}>← Back</Text>
@@ -195,7 +224,8 @@ export function TradeFormScreen({navigation, route}: Props) {
 
       <ScrollView
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag">
         <DateField label="Date" required value={date} onChange={setDate} />
         <Input
           label="Stock name"
@@ -296,7 +326,8 @@ export function TradeFormScreen({navigation, route}: Props) {
 
         <Text style={styles.sectionLabel}>Reason to buy</Text>
         <Text style={styles.hintTop}>
-          Select strategy conditions that apply to this trade.
+          Select strategy conditions that apply. Core = 2 marks · Minor = 1
+          mark.
         </Text>
         {!strategyId ? (
           <Text style={styles.hintTop}>
@@ -307,39 +338,44 @@ export function TradeFormScreen({navigation, route}: Props) {
             This strategy has no conditions — add them in the Strategy tab.
           </Text>
         ) : (
-          <View style={styles.strategyRow}>
-            {selectedStrategy.conditions.map(c => {
-              const on = reasonConditionIds.includes(c.id);
-              return (
-                <Pressable
-                  key={c.id}
-                  onPress={() => toggleReason(c.id)}
-                  style={[
-                    styles.strategyChip,
-                    on && styles.strategyChipActive,
-                  ]}>
-                  <Text
+          <>
+            <View style={styles.markBanner}>
+              <Text style={styles.markLabel}>Setup mark</Text>
+              <Text style={styles.markValue}>
+                {conditionMarks.score} / {conditionMarks.max}
+              </Text>
+            </View>
+            <View style={styles.strategyRow}>
+              {selectedStrategy.conditions.map(c => {
+                const on = reasonConditionIds.includes(c.id);
+                const marks = conditionWeightMarks(c.weight);
+                return (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => toggleReason(c.id)}
                     style={[
-                      styles.reqBadge,
-                      c.weight === 'secondary'
-                        ? styles.reqSecondary
-                        : c.weight === 'minor'
-                          ? styles.reqMinor
-                          : styles.reqCore,
+                      styles.strategyChip,
+                      on && styles.strategyChipActive,
                     ]}>
-                    {conditionWeightLabel(c.weight)}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.strategyText,
-                      on && styles.strategyTextActive,
-                    ]}>
-                    {c.text}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                    <Text
+                      style={[
+                        styles.reqBadge,
+                        c.weight === 'minor' ? styles.reqMinor : styles.reqCore,
+                      ]}>
+                      {conditionWeightLabel(c.weight)} · {marks}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.strategyText,
+                        on && styles.strategyTextActive,
+                      ]}>
+                      {c.text}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
         )}
 
         <SegmentedControl
@@ -361,7 +397,7 @@ export function TradeFormScreen({navigation, route}: Props) {
 
         <Text style={styles.sectionLabel}>Screenshots</Text>
         <Text style={styles.hintTop}>
-          Tap to view & zoom · Long-press to remove
+          Tap to view · Tap × to delete
         </Text>
         <ScreenshotGallery
           images={images}
@@ -416,6 +452,27 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     ...typography.caption,
     marginBottom: spacing.sm,
   },
+  markBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  markLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  markValue: {
+    ...typography.subtitle,
+    fontSize: 18,
+    color: colors.accent,
+  },
   strategyRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -450,9 +507,6 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
   },
   reqCore: {
     color: colors.accent,
-  },
-  reqSecondary: {
-    color: colors.warning,
   },
   reqMinor: {
     color: colors.textMuted,

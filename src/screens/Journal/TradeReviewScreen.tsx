@@ -23,9 +23,12 @@ import {
 import type {TradeOutcome} from '../../types';
 import {
   calcPnl,
+  calcPnlPercent,
+  calcTradedAmount,
   exitLevelForOutcome,
   formatINR,
   formatSignedINR,
+  formatSignedPercent,
 } from '../../utils/format';
 import type {JournalStackParamList} from '../../navigation/types';
 
@@ -115,6 +118,14 @@ export function TradeReviewScreen({navigation, route}: Props) {
     };
   }, [trade, outcome, exitPrice, charges, exitRequired]);
 
+  const previewPct =
+    trade && preview?.ready
+      ? calcPnlPercent(preview.pnl, trade.entryPrice, trade.quantity)
+      : null;
+  const tradedAmt = trade
+    ? calcTradedAmount(trade.entryPrice, trade.quantity)
+    : 0;
+
   const canSave = Boolean(outcome && preview?.ready);
 
   if (!trade) {
@@ -132,11 +143,17 @@ export function TradeReviewScreen({navigation, route}: Props) {
     }
 
     const ch = Number(charges) || 0;
+    const pct = calcPnlPercent(
+      preview.pnl,
+      trade.entryPrice,
+      trade.quantity,
+    );
     updateTrade(trade.id, {
       outcome,
       exitPrice: preview.exit,
       charges: ch,
       pnl: preview.pnl,
+      pnlPercent: pct ?? undefined,
       reviewNotes: reviewNotes.trim(),
       status: 'reviewed',
       reviewedAt: new Date().toISOString(),
@@ -145,7 +162,7 @@ export function TradeReviewScreen({navigation, route}: Props) {
   };
 
   return (
-    <SafeScreen>
+    <SafeScreen keyboardAvoiding>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()}>
           <Text style={styles.back}>← Back</Text>
@@ -156,7 +173,8 @@ export function TradeReviewScreen({navigation, route}: Props) {
 
       <ScrollView
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag">
         <Text style={styles.stock}>{trade.stockName}</Text>
         <Text style={styles.meta}>
           Entry {formatINR(trade.entryPrice)} · Qty {trade.quantity} ·{' '}
@@ -221,6 +239,9 @@ export function TradeReviewScreen({navigation, route}: Props) {
             <Text style={styles.resultExit}>
               Exit level {formatINR(preview.exit!)}
             </Text>
+            <Text style={styles.resultExit}>
+              Traded amount {formatINR(tradedAmt)}
+            </Text>
             <Text
               style={[
                 styles.resultPnl,
@@ -229,6 +250,22 @@ export function TradeReviewScreen({navigation, route}: Props) {
                 },
               ]}>
               {formatSignedINR(preview.pnl)}
+            </Text>
+            <Text
+              style={[
+                styles.resultPct,
+                {
+                  color:
+                    previewPct == null
+                      ? colors.textMuted
+                      : preview.pnl >= 0
+                        ? colors.profit
+                        : colors.loss,
+                },
+              ]}>
+              {previewPct == null
+                ? 'P&L % unavailable'
+                : formatSignedPercent(previewPct)}
             </Text>
           </View>
         ) : null}
@@ -349,6 +386,11 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
   resultPnl: {
     ...typography.numberLarge,
     marginTop: spacing.sm,
+  },
+  resultPct: {
+    ...typography.subtitle,
+    fontSize: 18,
+    marginTop: spacing.xs,
   },
   save: {
     marginTop: spacing.lg,

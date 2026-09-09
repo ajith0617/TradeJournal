@@ -4,6 +4,8 @@ import type {AppData} from '../types';
 import {migrateAppDataForBackup} from './storage';
 import {
   backupTradeImagesToFolder,
+  clearJournalFolderImages,
+  clearLocalTradeImages,
   journalDirFromBackupFile,
   restoreTradeImagesFromFolder,
   tradeImageFileName,
@@ -15,6 +17,7 @@ const FILE_NAME = 'journal-data.json';
 type FolderAccessNative = {
   hasAllFilesAccess: () => Promise<boolean>;
   openAllFilesAccessSettings: () => Promise<boolean>;
+  wipeJournalBackup: () => Promise<boolean>;
 };
 
 const FolderAccess = NativeModules.FolderAccess as FolderAccessNative | undefined;
@@ -221,4 +224,82 @@ export async function readFolderBackup(): Promise<AppData> {
 export async function folderBackupExists(): Promise<boolean> {
   const probe = await probeFolderBackup();
   return probe.readable || probe.existsButBlocked;
+}
+
+/**
+ * Wipe on-disk Journal backup: entire Journal folder (json + images) and local
+ * trade-images. Requires All files access on Android 11+.
+ * Throws if permission is missing or files could not be deleted.
+ */
+export async function wipeFolderBackupAndImages(): Promise<void> {
+  const allowed = await hasAllFilesAccess();
+  if (!allowed) {
+    throw new Error(
+      'Need All files access (not Camera or Photos) to delete Download/Journal. Enable it, then tap Start fresh again.',
+    );
+  }
+
+  // Native recursive delete is reliable with MANAGE_EXTERNAL_STORAGE
+  if (FolderAccess?.wipeJournalBackup) {
+    try {
+      await FolderAccess.wipeJournalBackup();
+    } catch (e) {
+      throw new Error(nativeErrorMessage(e, 'Could not delete Journal folder'));
+    }
+  } else {
+    // JS fallback if native module missing (older builds) — still verify below
+    for (const path of candidateFilePaths()) {
+      const journalDir = journalDirFromBackupFile(path);
+      await deletePathRecursive(journalDir);
+    }
+  }
+
+  // Extra JS cleanup for any leftover candidate paths / local cache
+  for (const path of candidateFilePaths()) {
+    await deletePathRecursive(journalDirFromBackupFile(path));
+  }
+  await clearJournalFolderImages();
+  await clearLocalTradeImages();
+
+  // Verify primary backup is gone before resetting the app
+  const probe = await probeFolderBackup();
+  if (probe.readable || probe.existsButBlocked) {
+    throw new Error(
+      'Journal backup is still on disk. Enable All files access, then tap Start fresh again.',
+    );
+  }
+}
+
+function nativeErrorMessage(e: unknown, fallback: string): string {
+  if (typeof e === 'string' && e.trim()) {
+    return e;
+  }
+  if (e instanceof Error && e.message.trim()) {
+    return e.message;
+  }
+  if (typeof e === 'object' && e) {
+    const obj = e as {message?: unknown; code?: unknown};
+    if (typeof obj.message === 'string' && obj.message.trim()) {
+      return obj.message;
+    }
+  }
+  return fallback;
+}
+
+async function deletePathRecursive(targetPath: string): Promise<void> {
+  try {
+    if (!(await RNFS.exists(targetPath))) {
+      return;
+    }
+    const stat = await RNFS.stat(targetPath);
+    if (stat.isDirectory()) {
+      const entries = await RNFS.readDir(targetPath);
+      for (const entry of entries) {
+        await deletePathRecursive(entry.path);
+      }
+    }
+    await RNFS.unlink(targetPath);
+  } catch {
+    // caller verifies leftover files
+  }
 }

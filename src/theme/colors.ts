@@ -29,25 +29,25 @@ export type ThemeDefinition = {
   colors: ColorPalette;
 };
 
-/** Current default — charcoal + mint */
+/** Default — graphite surfaces with restrained emerald */
 const darkColors: ColorPalette = {
-  bg: '#0A0C0F',
-  surface: '#12161C',
-  surfaceElevated: '#1A2029',
-  border: '#2A323E',
-  borderSubtle: '#1F2630',
-  text: '#E8ECF1',
-  textMuted: '#8B95A5',
-  textDim: '#5C6675',
-  accent: '#3DDC97',
-  accentMuted: 'rgba(61, 220, 151, 0.14)',
-  profit: '#3DDC97',
-  loss: '#FF6B6B',
-  lossMuted: 'rgba(255, 107, 107, 0.14)',
-  warning: '#F0B429',
+  bg: '#0A0B0D',
+  surface: '#13151A',
+  surfaceElevated: '#1C1F26',
+  border: '#2B303B',
+  borderSubtle: '#1F232B',
+  text: '#EDEFF2',
+  textMuted: '#8E96A3',
+  textDim: '#5E6673',
+  accent: '#2DB88A',
+  accentMuted: 'rgba(45, 184, 138, 0.12)',
+  profit: '#2DB88A',
+  loss: '#E5484D',
+  lossMuted: 'rgba(229, 72, 77, 0.12)',
+  warning: '#D4A017',
   white: '#FFFFFF',
-  overlay: 'rgba(0, 0, 0, 0.55)',
-  onAccent: '#04120C',
+  overlay: 'rgba(0, 0, 0, 0.58)',
+  onAccent: '#04140F',
 };
 
 const lightColors: ColorPalette = {
@@ -91,32 +91,32 @@ const oceanColors: ColorPalette = {
   onAccent: '#041018',
 };
 
-/** Cool gray + soft blue */
+/** Blue-gray dusk + terracotta — not near-black, distinct from Dark/Ocean */
 const slateColors: ColorPalette = {
-  bg: '#101216',
-  surface: '#181B22',
-  surfaceElevated: '#22262F',
-  border: '#343A46',
-  borderSubtle: '#272B34',
-  text: '#E9ECF2',
-  textMuted: '#9299A8',
-  textDim: '#636B7A',
-  accent: '#7C9CFF',
-  accentMuted: 'rgba(124, 156, 255, 0.16)',
-  profit: '#4ADE80',
-  loss: '#FB7185',
-  lossMuted: 'rgba(251, 113, 133, 0.14)',
-  warning: '#FBBF24',
+  bg: '#1B2430',
+  surface: '#243142',
+  surfaceElevated: '#2E3D52',
+  border: '#3D4E66',
+  borderSubtle: '#314257',
+  text: '#EEF2F7',
+  textMuted: '#9AABC0',
+  textDim: '#6B7F96',
+  accent: '#E07A5F',
+  accentMuted: 'rgba(224, 122, 95, 0.16)',
+  profit: '#4CAF82',
+  loss: '#E35D6A',
+  lossMuted: 'rgba(227, 93, 106, 0.14)',
+  warning: '#E6B422',
   white: '#FFFFFF',
-  overlay: 'rgba(0, 0, 0, 0.55)',
-  onAccent: '#0A0C12',
+  overlay: 'rgba(16, 22, 32, 0.55)',
+  onAccent: '#1A120E',
 };
 
 export const THEMES: Record<ThemeId, ThemeDefinition> = {
   dark: {
     id: 'dark',
     label: 'Dark',
-    description: 'Charcoal with mint accent',
+    description: 'Graphite with emerald accent',
     isDark: true,
     colors: darkColors,
   },
@@ -137,7 +137,7 @@ export const THEMES: Record<ThemeId, ThemeDefinition> = {
   slate: {
     id: 'slate',
     label: 'Slate',
-    description: 'Cool gray with blue',
+    description: 'Blue-gray dusk with terracotta',
     isDark: true,
     colors: slateColors,
   },

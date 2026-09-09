@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Button} from '../../components/Button';
+import {useConfirm} from '../../components/ConfirmProvider';
 import {useJournalStore} from '../../store/journalStore';
 import {
   describeBackupLocation,
@@ -13,6 +14,7 @@ import {radius, spacing, useThemedStyles} from '../../theme';
 
 export function RestoreFromFolderScreen() {
   const insets = useSafeAreaInsets();
+  const {confirm} = useConfirm();
   const styles = useThemedStyles(({colors, typography}) =>
     StyleSheet.create({
       screen: {
@@ -62,7 +64,7 @@ export function RestoreFromFolderScreen() {
     }),
   );
   const restoreFromFolder = useJournalStore(s => s.restoreFromFolder);
-  const dismissRestore = useJournalStore(s => s.dismissRestore);
+  const startFresh = useJournalStore(s => s.startFresh);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -101,10 +103,50 @@ export function RestoreFromFolderScreen() {
     }
   };
 
-  const onSkip = async () => {
+  const onStartFresh = async () => {
+    const ok = await confirm({
+      title: 'Start fresh?',
+      message:
+        'This permanently deletes the existing Journal backup file and all trade screenshots on this device. You cannot undo this.',
+      confirmLabel: 'Delete & start fresh',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
+    if (!ok) {
+      return;
+    }
+
     setBusy(true);
+    setError('');
     try {
-      await dismissRestore();
+      const allowed = await hasAllFilesAccess();
+      if (!allowed) {
+        setError(
+          'Turn on All files access for TradeJournal (not Camera / Photos), then tap Start fresh again.',
+        );
+        await openAllFilesAccessSettings();
+        return;
+      }
+
+      await startFresh();
+    } catch (e) {
+      const message =
+        e instanceof Error
+          ? e.message
+          : 'Could not clear existing Journal data.';
+      const blocked =
+        message.toLowerCase().includes('blocked') ||
+        message.toLowerCase().includes('all files') ||
+        message.toLowerCase().includes('permission') ||
+        message.toLowerCase().includes('access');
+      setError(message);
+      if (blocked) {
+        try {
+          await openAllFilesAccessSettings();
+        } catch {
+          // ignore
+        }
+      }
     } finally {
       setBusy(false);
     }
@@ -125,8 +167,8 @@ export function RestoreFromFolderScreen() {
         A backup was found in{'\n'}
         <Text style={styles.path}>{describeBackupLocation()}</Text>
         {'\n\n'}
-        Restore trades, rules, and strategies from that folder? You will still
-        need to log in after restoring.
+        Restore trades, rules, strategies, and screenshots from that folder? You
+        will still need to log in after restoring.
       </Text>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -140,7 +182,7 @@ export function RestoreFromFolderScreen() {
         <Button
           title="Start fresh"
           variant="secondary"
-          onPress={onSkip}
+          onPress={onStartFresh}
           disabled={busy}
           style={styles.skip}
         />

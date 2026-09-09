@@ -206,6 +206,7 @@ export function BiometricLockScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          showVisibilityToggle
           placeholder="Password"
         />
         <Button

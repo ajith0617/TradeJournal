@@ -1,6 +1,7 @@
 import React, {useMemo, useState} from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
@@ -110,7 +111,7 @@ export function RulesScreen() {
     setConditions(
       s.conditions.map(c => ({
         ...c,
-        weight: c.weight ?? 'core',
+        weight: c.weight === 'minor' ? 'minor' : 'core',
       })),
     );
     setConditionDraft('');
@@ -131,7 +132,7 @@ export function RulesScreen() {
   };
 
   const cycleWeight = (id: string) => {
-    const order: ConditionWeight[] = ['core', 'secondary', 'minor'];
+    const order: ConditionWeight[] = ['core', 'minor'];
     setConditions(prev =>
       prev.map(c => {
         if (c.id !== id) {
@@ -204,7 +205,7 @@ export function RulesScreen() {
   };
 
   return (
-    <SafeScreen>
+    <SafeScreen keyboardAvoiding>
       <ScreenHeader
         title="Rules"
         subtitle={quote}
@@ -269,7 +270,8 @@ export function RulesScreen() {
                   <Text style={styles.condition}>· {c.text}</Text>
                   <Text
                     style={[styles.weightTag, weightStyle(c.weight, colors)]}>
-                    {conditionWeightLabel(c.weight)}
+                    {conditionWeightLabel(c.weight)} ·{' '}
+                    {c.weight === 'core' ? '2' : '1'}
                   </Text>
                 </View>
               ))}
@@ -390,97 +392,105 @@ export function RulesScreen() {
       />
 
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet">
-        <View
-          style={[
-            styles.modal,
-            {
-              paddingTop: insets.top + spacing.md,
-              paddingBottom: insets.bottom + spacing.md,
-            },
-          ]}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => setOpen(false)}>
-              <Text style={styles.cancel}>Cancel</Text>
-            </Pressable>
-            <Text style={styles.modalTitle}>
-              {editing ? 'Edit strategy' : 'New strategy'}
-            </Text>
-            <View style={{width: 56}} />
-          </View>
-          <ScrollView
-            contentContainerStyle={styles.modalContent}
-            keyboardShouldPersistTaps="handled">
-            <Input
-              label="Name"
-              value={name}
-              onChangeText={setName}
-              placeholder="e.g. VWAP Pullback"
-            />
-            <Input
-              label="Description"
-              value={description}
-              onChangeText={setDescription}
-              placeholder="When and how you take this setup"
-              multiline
-              style={{minHeight: 72, textAlignVertical: 'top'}}
-            />
+        <KeyboardAvoidingView
+          style={styles.modalAvoid}
+          behavior="padding"
+          enabled>
+          <View
+            style={[
+              styles.modal,
+              {
+                paddingTop: insets.top + spacing.md,
+                paddingBottom: insets.bottom + spacing.md,
+              },
+            ]}>
+            <View style={styles.modalHeader}>
+              <Pressable onPress={() => setOpen(false)}>
+                <Text style={styles.cancel}>Cancel</Text>
+              </Pressable>
+              <Text style={styles.modalTitle}>
+                {editing ? 'Edit strategy' : 'New strategy'}
+              </Text>
+              <View style={{width: 56}} />
+            </View>
+            <ScrollView
+              contentContainerStyle={styles.modalContent}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag">
+              <Input
+                label="Name"
+                value={name}
+                onChangeText={setName}
+                placeholder="e.g. VWAP Pullback"
+              />
+              <Input
+                label="Description"
+                value={description}
+                onChangeText={setDescription}
+                placeholder="When and how you take this setup"
+                multiline
+                style={{minHeight: 72, textAlignVertical: 'top'}}
+              />
 
-            <Text style={styles.section}>Conditions</Text>
-            {conditions.map(c => (
-              <View key={c.id} style={styles.condRow}>
-                <View style={styles.condLeft}>
-                  <Text style={styles.condText}>{c.text}</Text>
-                  <Pressable onPress={() => cycleWeight(c.id)}>
-                    <Text style={[styles.weightTag, weightStyle(c.weight, colors)]}>
-                      {conditionWeightLabel(c.weight)} · tap to change
-                    </Text>
+              <Text style={styles.section}>Conditions</Text>
+              {conditions.map(c => (
+                <View key={c.id} style={styles.condRow}>
+                  <View style={styles.condLeft}>
+                    <Text style={styles.condText}>{c.text}</Text>
+                    <Pressable onPress={() => cycleWeight(c.id)}>
+                      <Text
+                        style={[
+                          styles.weightTag,
+                          weightStyle(c.weight, colors),
+                        ]}>
+                        {conditionWeightLabel(c.weight)} ·{' '}
+                        {c.weight === 'core' ? '2' : '1'} · tap to change
+                      </Text>
+                    </Pressable>
+                  </View>
+                  <Pressable onPress={() => removeCondition(c.id)}>
+                    <Text style={styles.delete}>Remove</Text>
                   </Pressable>
                 </View>
-                <Pressable onPress={() => removeCondition(c.id)}>
-                  <Text style={styles.delete}>Remove</Text>
-                </Pressable>
+              ))}
+              <View style={styles.condAdd}>
+                <Input
+                  label="Add condition"
+                  value={conditionDraft}
+                  onChangeText={setConditionDraft}
+                  placeholder="e.g. Price above VWAP"
+                  style={{marginBottom: spacing.md}}
+                />
+                <SegmentedControl
+                  label="Mandatory type"
+                  options={CONDITION_WEIGHT_OPTIONS.map(o => ({
+                    label: o.label,
+                    value: o.value,
+                  }))}
+                  value={conditionWeight}
+                  onChange={setConditionWeight}
+                />
+                <Button
+                  title="Add condition"
+                  onPress={addCondition}
+                  variant="secondary"
+                />
               </View>
-            ))}
-            <View style={styles.condAdd}>
-              <Input
-                label="Add condition"
-                value={conditionDraft}
-                onChangeText={setConditionDraft}
-                placeholder="e.g. Price above VWAP"
-                style={{marginBottom: spacing.md}}
-              />
-              <SegmentedControl
-                label="Type"
-                options={CONDITION_WEIGHT_OPTIONS.map(o => ({
-                  label: o.label,
-                  value: o.value,
-                }))}
-                value={conditionWeight}
-                onChange={setConditionWeight}
-              />
-              <Button
-                title="Add condition"
-                onPress={addCondition}
-                variant="secondary"
-              />
-            </View>
 
-            <Button
-              title="Save strategy"
-              onPress={onSaveStrategy}
-              style={styles.save}
-            />
-          </ScrollView>
-        </View>
+              <Button
+                title="Save strategy"
+                onPress={onSaveStrategy}
+                style={styles.save}
+              />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeScreen>
   );
 }
 
 function weightStyle(weight: ConditionWeight, colors: ColorPalette) {
-  if (weight === 'secondary') {
-    return {color: colors.warning};
-  }
   if (weight === 'minor') {
     return {color: colors.textMuted};
   }
@@ -657,6 +667,10 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     color: colors.loss,
   },
   modal: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  modalAvoid: {
     flex: 1,
     backgroundColor: colors.bg,
   },

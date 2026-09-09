@@ -19,11 +19,14 @@ import {
   type AppTypography,
   type ColorPalette,
 } from '../../theme';
-import {conditionWeightLabel, type ConditionWeight} from '../../types';
+import {conditionWeightLabel, conditionWeightMarks, type ConditionWeight} from '../../types';
 import {
+  calcPnlPercent,
+  calcTradedAmount,
   formatDisplayDate,
   formatINR,
   formatSignedINR,
+  formatSignedPercent,
 } from '../../utils/format';
 import type {JournalStackParamList} from '../../navigation/types';
 
@@ -36,6 +39,7 @@ export function TradeDetailScreen({navigation, route}: Props) {
   const trade = useJournalStore(s => s.trades.find(t => t.id === tradeId));
   const strategies = useJournalStore(s => s.strategies);
   const deleteTrade = useJournalStore(s => s.deleteTrade);
+  const removeTradeImage = useJournalStore(s => s.removeTradeImage);
 
   const strategyName = useMemo(() => {
     if (!trade?.strategyId) {
@@ -50,7 +54,7 @@ export function TradeDetailScreen({navigation, route}: Props) {
       for (const c of s.conditions) {
         m.set(c.id, {
           text: c.text,
-          weight: c.weight ?? 'core',
+          weight: c.weight === 'minor' ? 'minor' : 'core',
         });
       }
     }
@@ -79,11 +83,16 @@ export function TradeDetailScreen({navigation, route}: Props) {
 
   const isOpen = trade.status === 'open';
   const positive = trade.pnl >= 0;
+  const tradedAmt = calcTradedAmount(trade.entryPrice, trade.quantity);
+  const pnlPercent = !isOpen
+    ? (trade.pnlPercent ??
+      calcPnlPercent(trade.pnl, trade.entryPrice, trade.quantity))
+    : null;
 
   const onDelete = async () => {
     const ok = await confirm({
       title: 'Delete trade?',
-      message: 'This cannot be undone.',
+      message: 'This also deletes its screenshots from the Journal folder. This cannot be undone.',
       confirmLabel: 'Delete',
       tone: 'danger',
     });
@@ -92,6 +101,20 @@ export function TradeDetailScreen({navigation, route}: Props) {
     }
     deleteTrade(trade.id);
     navigation.goBack();
+  };
+
+  const onRemoveImage = async (uri: string) => {
+    const ok = await confirm({
+      title: 'Delete screenshot?',
+      message:
+        'This removes the image from the trade and from the Journal folder immediately.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) {
+      return;
+    }
+    removeTradeImage(trade.id, uri);
   };
 
   return (
@@ -133,9 +156,17 @@ export function TradeDetailScreen({navigation, route}: Props) {
         {isOpen ? (
           <Text style={styles.openHint}>Open trade — review when you exit</Text>
         ) : (
-          <Text style={[styles.pnl, positive ? styles.profit : styles.loss]}>
-            {formatSignedINR(trade.pnl)}
-          </Text>
+          <View>
+            <Text style={[styles.pnl, positive ? styles.profit : styles.loss]}>
+              {formatSignedINR(trade.pnl)}
+            </Text>
+            <Text
+              style={[styles.pnlPct, positive ? styles.profit : styles.loss]}>
+              {pnlPercent == null
+                ? 'P&L % unavailable'
+                : formatSignedPercent(pnlPercent)}
+            </Text>
+          </View>
         )}
         <Text style={styles.date}>{formatDisplayDate(trade.date)}</Text>
 
@@ -144,6 +175,18 @@ export function TradeDetailScreen({navigation, route}: Props) {
           <Row label="Direction" value={trade.direction} />
           <Row label="Quantity" value={String(trade.quantity)} />
           <Row label="Entry" value={formatINR(trade.entryPrice)} />
+          <Row
+            label="Traded amount"
+            value={tradedAmt > 0 ? formatINR(tradedAmt) : '—'}
+          />
+          {!isOpen ? (
+            <Row
+              label="P&L %"
+              value={
+                pnlPercent == null ? '—' : formatSignedPercent(pnlPercent)
+              }
+            />
+          ) : null}
           <Row
             label="Stop loss"
             value={
@@ -171,6 +214,21 @@ export function TradeDetailScreen({navigation, route}: Props) {
             </>
           ) : null}
           <Row label="Strategy" value={strategyName} />
+          <Row
+            label="Setup mark"
+            value={
+              trade.conditionScoreMax != null && trade.conditionScoreMax > 0
+                ? `${trade.conditionScore ?? 0} / ${trade.conditionScoreMax}`
+                : reasonItems.length > 0
+                  ? String(
+                      reasonItems.reduce(
+                        (sum, item) => sum + conditionWeightMarks(item.weight),
+                        0,
+                      ),
+                    )
+                  : '—'
+            }
+          />
           <Row label="Emotion" value={trade.emotion} />
         </View>
 
@@ -182,13 +240,10 @@ export function TradeDetailScreen({navigation, route}: Props) {
                 <Text
                   style={[
                     styles.reqBadge,
-                    item.weight === 'secondary'
-                      ? styles.reqSecondary
-                      : item.weight === 'minor'
-                        ? styles.reqMinor
-                        : styles.reqCore,
+                    item.weight === 'minor' ? styles.reqMinor : styles.reqCore,
                   ]}>
-                  {conditionWeightLabel(item.weight)}
+                  {conditionWeightLabel(item.weight)} ·{' '}
+                  {conditionWeightMarks(item.weight)}
                 </Text>
                 <Text style={styles.notes}>· {item.text}</Text>
               </View>
@@ -213,10 +268,13 @@ export function TradeDetailScreen({navigation, route}: Props) {
         {trade.images.length > 0 ? (
           <View>
             <Text style={styles.notesLabel}>Screenshots</Text>
-            <Text style={styles.zoomHint}>Tap to view · pinch to zoom</Text>
+            <Text style={styles.zoomHint}>
+              Tap to view · Tap × to delete from Journal folder
+            </Text>
             <ScreenshotGallery
               images={trade.images}
               imageStyle={styles.image}
+              onRemove={onRemoveImage}
             />
           </View>
         ) : null}
@@ -320,6 +378,11 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     ...typography.numberLarge,
     marginTop: spacing.sm,
   },
+  pnlPct: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: spacing.xs,
+  },
   profit: {color: colors.profit},
   loss: {color: colors.loss},
   date: {
@@ -376,9 +439,6 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
   },
   reqCore: {
     color: colors.accent,
-  },
-  reqSecondary: {
-    color: colors.warning,
   },
   reqMinor: {
     color: colors.textMuted,

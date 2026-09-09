@@ -1,5 +1,12 @@
 import React, {useMemo, useState} from 'react';
-import {Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle} from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import ImageViewing from 'react-native-image-viewing';
 import {TradeImage} from './TradeImage';
 import {toDisplayImageUri} from '../services/tradeImages';
@@ -11,7 +18,7 @@ type Props = {
   imageStyle?: StyleProp<ViewStyle>;
   /** Wrap style for the row */
   style?: StyleProp<ViewStyle>;
-  /** Long-press to remove (edit form) */
+  /** Remove callback (edit form) — tap × or long-press */
   onRemove?: (uri: string) => void;
   /** Extra node in the thumbnail row (e.g. add button) */
   trailing?: React.ReactNode;
@@ -62,6 +69,24 @@ export function ScreenshotGallery({
         fontSize: 10,
         fontWeight: '600',
       },
+      removeBtn: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2,
+      },
+      removeBtnText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
+        lineHeight: 16,
+      },
       header: {
         paddingTop: 52,
         paddingHorizontal: spacing.lg,
@@ -79,14 +104,17 @@ export function ScreenshotGallery({
         color: colors.accent,
         fontWeight: '700',
       },
+      deleteHeader: {
+        ...typography.body,
+        color: colors.loss,
+        fontWeight: '700',
+      },
     }),
   );
 
   const viewerImages = useMemo(
     () =>
-      images
-        .filter(Boolean)
-        .map(uri => ({uri: toDisplayImageUri(uri)})),
+      images.filter(Boolean).map(uri => ({uri: toDisplayImageUri(uri)})),
     [images],
   );
 
@@ -98,19 +126,30 @@ export function ScreenshotGallery({
     <View style={style}>
       <View style={styles.row}>
         {images.map((uri, i) => (
-          <Pressable
-            key={`${uri}-${i}`}
-            onPress={() => {
-              setIndex(i);
-              setVisible(true);
-            }}
-            onLongPress={onRemove ? () => onRemove(uri) : undefined}
-            style={[styles.thumbWrap, imageStyle]}>
-            <TradeImage uri={uri} style={[styles.thumbFill, imageStyle]} />
-            <View style={styles.zoomHint} pointerEvents="none">
-              <Text style={styles.zoomHintText}>View</Text>
-            </View>
-          </Pressable>
+          <View key={`${uri}-${i}`} style={[styles.thumbWrap, imageStyle]}>
+            <Pressable
+              onPress={() => {
+                setIndex(i);
+                setVisible(true);
+              }}
+              onLongPress={onRemove ? () => onRemove(uri) : undefined}
+              style={styles.thumbFill}>
+              <TradeImage uri={uri} style={[styles.thumbFill, imageStyle]} />
+              <View style={styles.zoomHint} pointerEvents="none">
+                <Text style={styles.zoomHintText}>View</Text>
+              </View>
+            </Pressable>
+            {onRemove ? (
+              <Pressable
+                onPress={() => onRemove(uri)}
+                style={styles.removeBtn}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="Delete image">
+                <Text style={styles.removeBtnText}>×</Text>
+              </Pressable>
+            ) : null}
+          </View>
         ))}
         {trailing}
       </View>
@@ -130,9 +169,29 @@ export function ScreenshotGallery({
               <Text style={styles.headerText}>
                 {imageIndex + 1} / {viewerImages.length}
               </Text>
-              <Pressable onPress={() => setVisible(false)} hitSlop={12}>
-                <Text style={styles.close}>Close</Text>
-              </Pressable>
+              <View style={{flexDirection: 'row', gap: spacing.lg}}>
+                {onRemove ? (
+                  <Pressable
+                    onPress={() => {
+                      const target = images[imageIndex];
+                      if (!target) {
+                        return;
+                      }
+                      onRemove(target);
+                      if (images.length <= 1) {
+                        setVisible(false);
+                      } else {
+                        setIndex(Math.min(imageIndex, images.length - 2));
+                      }
+                    }}
+                    hitSlop={12}>
+                    <Text style={styles.deleteHeader}>Delete</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={() => setVisible(false)} hitSlop={12}>
+                  <Text style={styles.close}>Close</Text>
+                </Pressable>
+              </View>
             </View>
           )}
         />

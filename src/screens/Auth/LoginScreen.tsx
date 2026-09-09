@@ -127,6 +127,7 @@ export function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            showVisibilityToggle
             placeholder="Password"
           />
 

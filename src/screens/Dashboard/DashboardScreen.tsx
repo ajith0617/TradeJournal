@@ -23,7 +23,7 @@ import {
   type AppTypography,
   type ColorPalette,
 } from '../../theme';
-import {formatDisplayDate, formatSignedINR} from '../../utils/format';
+import {formatDisplayDate, formatINR, formatSignedINR, formatSignedPercent} from '../../utils/format';
 import {
   computeStats,
   filterTradesByDateRange,
@@ -217,6 +217,23 @@ export function DashboardScreen() {
                   ]}>
                   {formatSignedINR(stats.netPnl)}
                 </Text>
+                {stats.netPnlPercent != null ? (
+                  <Text
+                    style={[
+                      styles.heroPct,
+                      {
+                        color:
+                          stats.netPnl >= 0 ? colors.profit : colors.loss,
+                      },
+                    ]}>
+                    {formatSignedPercent(stats.netPnlPercent)}
+                  </Text>
+                ) : null}
+                {stats.tradedAmount > 0 ? (
+                  <Text style={styles.heroTraded}>
+                    Traded amount {formatINR(stats.tradedAmount)}
+                  </Text>
+                ) : null}
                 <Text style={styles.heroSub}>
                   {stats.count} reviewed · {stats.winRate}% win rate
                   {stats.openCount > 0 ? ` · ${stats.openCount} open` : ''}
@@ -266,20 +283,34 @@ export function DashboardScreen() {
                 delay={Math.min(index, 6) * 40}
                 trigger={rangeKey}>
                 <View style={styles.strategyRow}>
-                  <View>
+                  <View style={styles.strategyLeft}>
                     <Text style={styles.strategyName}>{row.name}</Text>
                     <Text style={styles.strategyCount}>
                       {row.count} trades
                     </Text>
                   </View>
-                  <Text
-                    style={{
-                      ...typography.number,
-                      fontSize: 15,
-                      color: row.pnl >= 0 ? colors.profit : colors.loss,
-                    }}>
-                    {formatSignedINR(row.pnl)}
-                  </Text>
+                  <View style={styles.strategyRight}>
+                    <Text
+                      style={{
+                        ...typography.number,
+                        fontSize: 15,
+                        color: row.pnl >= 0 ? colors.profit : colors.loss,
+                      }}>
+                      {formatSignedINR(row.pnl)}
+                    </Text>
+                    {row.pnlPercent != null ? (
+                      <Text
+                        style={[
+                          styles.strategyPct,
+                          {
+                            color:
+                              row.pnl >= 0 ? colors.profit : colors.loss,
+                          },
+                        ]}>
+                        {formatSignedPercent(row.pnlPercent)}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
               </FadeSlideIn>
             ))
@@ -395,6 +426,17 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
       ...typography.numberLarge,
       marginVertical: spacing.sm,
     },
+    heroPct: {
+      fontSize: 20,
+      fontWeight: '700',
+      marginBottom: spacing.sm,
+      marginTop: -spacing.xs,
+    },
+    heroTraded: {
+      ...typography.body,
+      color: colors.textMuted,
+      marginBottom: spacing.sm,
+    },
     heroSub: {
       ...typography.bodyMuted,
     },
@@ -437,12 +479,24 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.borderSubtle,
     },
+    strategyLeft: {
+      flex: 1,
+      paddingRight: spacing.md,
+    },
+    strategyRight: {
+      alignItems: 'flex-end',
+    },
     strategyName: {
       ...typography.body,
       fontWeight: '600',
     },
     strategyCount: {
       ...typography.caption,
+      marginTop: 2,
+    },
+    strategyPct: {
+      fontSize: 12,
+      fontWeight: '700',
       marginTop: 2,
     },
   });

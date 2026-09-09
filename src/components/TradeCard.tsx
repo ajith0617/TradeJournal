@@ -2,7 +2,12 @@ import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import type {Trade} from '../types';
 import {radius, spacing, useThemedStyles} from '../theme';
-import {formatDisplayDate, formatSignedINR} from '../utils/format';
+import {
+  calcPnlPercent,
+  formatDisplayDate,
+  formatSignedINR,
+  formatSignedPercent,
+} from '../utils/format';
 import {TradeImage} from './TradeImage';
 
 interface Props {
@@ -14,6 +19,10 @@ interface Props {
 export function TradeCard({trade, strategyName, onPress}: Props) {
   const isOpen = trade.status === 'open';
   const positive = trade.pnl >= 0;
+  const pnlPercent = !isOpen
+    ? (trade.pnlPercent ??
+      calcPnlPercent(trade.pnl, trade.entryPrice, trade.quantity))
+    : null;
   const styles = useThemedStyles(({colors, typography}) =>
     StyleSheet.create({
       card: {
@@ -70,9 +79,18 @@ export function TradeCard({trade, strategyName, onPress}: Props) {
         ...typography.caption,
         marginTop: 2,
       },
+      pnlCol: {
+        alignItems: 'flex-end',
+        maxWidth: '46%',
+      },
       pnl: {
         ...typography.number,
         fontSize: 16,
+      },
+      pnlPct: {
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: 3,
       },
       openPnl: {
         ...typography.caption,
@@ -98,6 +116,25 @@ export function TradeCard({trade, strategyName, onPress}: Props) {
       tagMuted: {
         ...typography.caption,
         color: colors.textDim,
+      },
+      bottomLeft: {
+        flex: 1,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingRight: spacing.sm,
+      },
+      markChip: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        backgroundColor: colors.accentMuted,
+      },
+      markChipText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: colors.accent,
       },
       thumbs: {
         flexDirection: 'row',
@@ -141,17 +178,35 @@ export function TradeCard({trade, strategyName, onPress}: Props) {
         {isOpen ? (
           <Text style={styles.openPnl}>Open</Text>
         ) : (
-          <Text style={[styles.pnl, positive ? styles.profit : styles.loss]}>
-            {formatSignedINR(trade.pnl)}
-          </Text>
+          <View style={styles.pnlCol}>
+            <Text
+              style={[styles.pnl, positive ? styles.profit : styles.loss]}
+              numberOfLines={1}>
+              {formatSignedINR(trade.pnl)}
+            </Text>
+            <Text
+              style={[styles.pnlPct, positive ? styles.profit : styles.loss]}
+              numberOfLines={1}>
+              {pnlPercent == null ? '—' : formatSignedPercent(pnlPercent)}
+            </Text>
+          </View>
         )}
       </View>
       <View style={styles.bottom}>
-        {strategyName ? (
-          <Text style={styles.tag}>{strategyName}</Text>
-        ) : (
-          <Text style={styles.tagMuted}>No strategy</Text>
-        )}
+        <View style={styles.bottomLeft}>
+          {strategyName ? (
+            <Text style={styles.tag}>{strategyName}</Text>
+          ) : (
+            <Text style={styles.tagMuted}>No strategy</Text>
+          )}
+          {trade.conditionScoreMax != null && trade.conditionScoreMax > 0 ? (
+            <View style={styles.markChip}>
+              <Text style={styles.markChipText}>
+                {trade.conditionScore ?? 0}/{trade.conditionScoreMax}
+              </Text>
+            </View>
+          ) : null}
+        </View>
         {trade.images.length > 0 ? (
           <View style={styles.thumbs}>
             {trade.images.slice(0, 3).map((uri, i) => (

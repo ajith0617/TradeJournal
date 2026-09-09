@@ -369,7 +369,7 @@ export function ProfileScreen() {
   };
 
   return (
-    <SafeScreen>
+    <SafeScreen keyboardAvoiding>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()}>
           <Text style={styles.back}>← Back</Text>
@@ -386,7 +386,8 @@ export function ProfileScreen() {
 
       <ScrollView
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag">
         <FadeSlideIn delay={40}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>
@@ -450,6 +451,7 @@ export function ProfileScreen() {
                       value={currentPassword}
                       onChangeText={setCurrentPassword}
                       secureTextEntry
+                      showVisibilityToggle
                       placeholder="Current password"
                     />
                     <Input
@@ -458,6 +460,7 @@ export function ProfileScreen() {
                       value={newPassword}
                       onChangeText={setNewPassword}
                       secureTextEntry
+                      showVisibilityToggle
                       placeholder="New password"
                     />
                     <Input
@@ -466,6 +469,7 @@ export function ProfileScreen() {
                       value={confirmPassword}
                       onChangeText={setConfirmPassword}
                       secureTextEntry
+                      showVisibilityToggle
                       placeholder="Confirm new password"
                     />
                     {passwordError ? (

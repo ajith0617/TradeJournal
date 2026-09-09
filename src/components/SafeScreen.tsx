@@ -1,5 +1,11 @@
 import React from 'react';
-import {StyleSheet, View, type StyleProp, type ViewStyle} from 'react-native';
+import {
+  KeyboardAvoidingView,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useThemedStyles} from '../theme';
 
@@ -10,6 +16,10 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   /** Which edges to pad. Tab screens usually omit bottom (tab bar handles it). */
   edges?: Edge[];
+  /** Lift form content above the soft keyboard. */
+  keyboardAvoiding?: boolean;
+  /** Extra offset for headers / status bar when avoiding the keyboard. */
+  keyboardVerticalOffset?: number;
 };
 
 /**
@@ -20,6 +30,8 @@ export function SafeScreen({
   children,
   style,
   edges = ['top', 'left', 'right'],
+  keyboardAvoiding = false,
+  keyboardVerticalOffset = 0,
 }: Props) {
   const insets = useSafeAreaInsets();
   const styles = useThemedStyles(({colors}) =>
@@ -28,20 +40,32 @@ export function SafeScreen({
         flex: 1,
         backgroundColor: colors.bg,
       },
+      fill: {
+        flex: 1,
+      },
     }),
   );
 
+  const edgePadding = [
+    edges.includes('top') && {paddingTop: insets.top},
+    edges.includes('bottom') && {paddingBottom: insets.bottom},
+    edges.includes('left') && {paddingLeft: insets.left},
+    edges.includes('right') && {paddingRight: insets.right},
+  ];
+
+  if (keyboardAvoiding) {
+    return (
+      <KeyboardAvoidingView
+        style={[styles.base, style]}
+        behavior="padding"
+        keyboardVerticalOffset={keyboardVerticalOffset}
+        enabled>
+        <View style={[styles.fill, ...edgePadding]}>{children}</View>
+      </KeyboardAvoidingView>
+    );
+  }
+
   return (
-    <View
-      style={[
-        styles.base,
-        edges.includes('top') && {paddingTop: insets.top},
-        edges.includes('bottom') && {paddingBottom: insets.bottom},
-        edges.includes('left') && {paddingLeft: insets.left},
-        edges.includes('right') && {paddingRight: insets.right},
-        style,
-      ]}>
-      {children}
-    </View>
+    <View style={[styles.base, ...edgePadding, style]}>{children}</View>
   );
 }

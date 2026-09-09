@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {AppData, Trade} from '../types';
+import {normalizeConditionWeight} from '../types';
 import {tradeImageFileName} from './tradeImages';
 import {resolveThemeId} from '../theme';
 import {createId} from '../utils/id';
+import {calcPnlPercent} from '../utils/format';
 
 const STORAGE_KEY = '@journal/app_data_v1';
 
@@ -65,7 +67,7 @@ export const defaultStrategies = (): AppData['strategies'] => [
       {
         id: createId(),
         text: 'Volume expansion on break',
-        weight: 'secondary',
+        weight: 'core',
       },
       {
         id: createId(),
@@ -136,30 +138,14 @@ function migrateAppData(data: AppData): AppData {
         id: string;
         text: string;
       };
-      let weight: 'core' | 'secondary' | 'minor' = 'core';
-      if (
-        anyC.weight === 'core' ||
-        anyC.weight === 'secondary' ||
-        anyC.weight === 'minor'
-      ) {
-        weight = anyC.weight;
-      } else if (
-        anyC.weight === 'essential' ||
-        anyC.requirement === 'mandatory'
-      ) {
-        weight = 'core';
-      } else if (
-        anyC.weight === 'supporting' ||
-        anyC.weight === 'confirm'
-      ) {
-        weight = 'secondary';
-      } else if (
+      // optional / contextual → minor; everything else (incl. legacy secondary) → core
+      const weight =
+        anyC.requirement === 'optional' ||
+        anyC.weight === 'minor' ||
         anyC.weight === 'contextual' ||
-        anyC.weight === 'filter' ||
-        anyC.requirement === 'optional'
-      ) {
-        weight = 'minor';
-      }
+        anyC.weight === 'filter'
+          ? normalizeConditionWeight('minor')
+          : normalizeConditionWeight(anyC.weight ?? 'core');
       return {id: anyC.id, text: anyC.text, weight};
     }),
   }));
@@ -190,6 +176,15 @@ function migrateAppData(data: AppData): AppData {
       exitPrice: anyT.exitPrice,
       charges: anyT.charges ?? 0,
       pnl: anyT.pnl ?? 0,
+      pnlPercent:
+        anyT.pnlPercent ??
+        (status === 'reviewed'
+          ? calcPnlPercent(
+              anyT.pnl ?? 0,
+              anyT.entryPrice,
+              anyT.quantity,
+            ) ?? undefined
+          : undefined),
       reviewNotes: anyT.reviewNotes ?? '',
       images: (anyT.images ?? []).map((img: string) => tradeImageFileName(img)),
       notes: anyT.notes ?? '',

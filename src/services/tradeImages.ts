@@ -1,6 +1,13 @@
+import {NativeModules} from 'react-native';
 import RNFS from 'react-native-fs';
 
 export const TRADE_IMAGE_DIR = `${RNFS.DocumentDirectoryPath}/trade-images`;
+
+type FolderAccessNative = {
+  deleteJournalImages?: (names: string[]) => Promise<number>;
+};
+
+const FolderAccess = NativeModules.FolderAccess as FolderAccessNative | undefined;
 
 async function ensureImageDir(): Promise<void> {
   if (!(await RNFS.exists(TRADE_IMAGE_DIR))) {
@@ -208,4 +215,100 @@ export async function restoreTradeImagesFromFolder(
 
 export function journalDirFromBackupFile(backupFilePath: string): string {
   return backupFilePath.replace(/\/[^/]+$/, '');
+}
+
+async function unlinkQuiet(path: string): Promise<void> {
+  try {
+    if (await RNFS.exists(path)) {
+      await RNFS.unlink(path);
+    }
+  } catch {
+    // ignore missing / permission errors
+  }
+}
+
+/** Candidate Journal folder roots (Download/Journal, etc.). */
+export function candidateJournalDirs(): string[] {
+  const dirs: string[] = [];
+  if (RNFS.DownloadDirectoryPath) {
+    dirs.push(`${RNFS.DownloadDirectoryPath}/Journal`);
+  }
+  const root = RNFS.ExternalStorageDirectoryPath;
+  if (root) {
+    dirs.push(`${root}/Download/Journal`);
+    dirs.push(`${root}/Documents/Journal`);
+  }
+  if (RNFS.ExternalDirectoryPath) {
+    dirs.push(`${RNFS.ExternalDirectoryPath}/Journal`);
+  }
+  return [...new Set(dirs)];
+}
+
+/** Delete image files from app storage and Journal/images mirrors. */
+export async function deleteTradeImages(refs: string[]): Promise<void> {
+  const names = [
+    ...new Set(
+      refs.filter(Boolean).map(r => tradeImageFileName(r)).filter(Boolean),
+    ),
+  ];
+  if (names.length === 0) {
+    return;
+  }
+
+  // App-private copies
+  for (const name of names) {
+    await unlinkQuiet(`${TRADE_IMAGE_DIR}/${name}`);
+  }
+
+  // Native delete into Download/Journal/images (reliable with storage access)
+  if (FolderAccess?.deleteJournalImages) {
+    try {
+      await FolderAccess.deleteJournalImages(names);
+    } catch {
+      // fall through to RNFS
+    }
+  }
+
+  // JS fallback for all candidate Journal folders
+  for (const dir of candidateJournalDirs()) {
+    for (const name of names) {
+      await unlinkQuiet(`${dir}/images/${name}`);
+    }
+  }
+}
+
+/** Remove every file under the local trade-images directory. */
+export async function clearLocalTradeImages(): Promise<void> {
+  try {
+    if (!(await RNFS.exists(TRADE_IMAGE_DIR))) {
+      return;
+    }
+    const entries = await RNFS.readDir(TRADE_IMAGE_DIR);
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        await unlinkQuiet(entry.path);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/** Delete every image under each Journal/images folder (and the folder). */
+export async function clearJournalFolderImages(): Promise<void> {
+  for (const dir of candidateJournalDirs()) {
+    const imagesDir = `${dir}/images`;
+    try {
+      if (!(await RNFS.exists(imagesDir))) {
+        continue;
+      }
+      const entries = await RNFS.readDir(imagesDir);
+      for (const entry of entries) {
+        await unlinkQuiet(entry.path);
+      }
+      await unlinkQuiet(imagesDir);
+    } catch {
+      // try next
+    }
+  }
 }

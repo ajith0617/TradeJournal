@@ -17,8 +17,8 @@ export type TradeStatus = 'open' | 'reviewed';
 
 export type TradeOutcome = 'win' | 'loss';
 
-/** Condition priority inside a strategy */
-export type ConditionWeight = 'core' | 'secondary' | 'minor';
+/** Condition priority inside a strategy — Core = 2 marks, Minor = 1 mark */
+export type ConditionWeight = 'core' | 'minor';
 
 
 export interface Trade {
@@ -34,6 +34,18 @@ export interface Trade {
   /** Strategy condition ids selected as reasons to take the trade */
   reasonConditionIds: string[];
   strategyId?: string;
+  /**
+   * Setup quality marks from selected conditions at entry
+   * (Core = 2, Minor = 1). Snapshot so history stays stable.
+   */
+  conditionScore?: number;
+  /** Max possible marks for the strategy conditions at entry */
+  conditionScoreMax?: number;
+  /**
+   * P&L % vs traded amount (entry × qty), saved at review.
+   * Example: traded ₹10,000 and profit ₹250 → 2.5
+   */
+  pnlPercent?: number;
   emotion: Emotion;
   /** Notes at entry (why you took it) */
   notes: string;
@@ -108,13 +120,41 @@ export const CONDITION_WEIGHT_OPTIONS: {
   value: ConditionWeight;
   label: string;
 }[] = [
-  {value: 'core', label: 'Core'},
-  {value: 'secondary', label: 'Secondary'},
-  {value: 'minor', label: 'Minor'},
+  {value: 'core', label: 'Core · 2'},
+  {value: 'minor', label: 'Minor · 1'},
 ];
 
 export function conditionWeightLabel(weight: ConditionWeight): string {
-  return (
-    CONDITION_WEIGHT_OPTIONS.find(o => o.value === weight)?.label ?? 'Core'
-  );
+  return weight === 'minor' ? 'Minor' : 'Core';
+}
+
+/** Marks awarded when a condition is selected on a trade. */
+export function conditionWeightMarks(weight: ConditionWeight): number {
+  return weight === 'core' ? 2 : 1;
+}
+
+export function normalizeConditionWeight(value: unknown): ConditionWeight {
+  if (value === 'minor' || value === 'contextual' || value === 'filter') {
+    return 'minor';
+  }
+  // Legacy "secondary" / supporting → treat as core (higher bar)
+  return 'core';
+}
+
+/** Score selected strategy conditions (and optional max for that strategy). */
+export function scoreTradeConditions(
+  conditions: StrategyCondition[],
+  selectedIds: string[],
+): {score: number; max: number} {
+  const selected = new Set(selectedIds);
+  let score = 0;
+  let max = 0;
+  for (const c of conditions) {
+    const marks = conditionWeightMarks(c.weight);
+    max += marks;
+    if (selected.has(c.id)) {
+      score += marks;
+    }
+  }
+  return {score, max};
 }

@@ -11,8 +11,9 @@ import type {
 } from '../types';
 import {createId} from '../utils/id';
 import {todayISO} from '../utils/format';
-import {loadAppData, saveAppData} from '../services/storage';
-import {writeFolderBackup} from '../services/folderBackup';
+import {deleteTradeImages, tradeImageFileName} from '../services/tradeImages';
+import {createDefaultData, loadAppData, saveAppData} from '../services/storage';
+import {writeFolderBackup, wipeFolderBackupAndImages} from '../services/folderBackup';
 import {resolveThemeId} from '../theme';
 
 type TradeInput = Omit<Trade, 'id' | 'createdAt' | 'updatedAt'>;
@@ -33,10 +34,14 @@ interface JournalState extends AppData {
   loginSuccess: (profile: UserProfile) => void;
   logout: () => void;
   dismissRestore: () => Promise<void>;
+  /** Wipe folder backup + images and seed a clean local journal. */
+  startFresh: () => Promise<void>;
   restoreFromFolder: (data: AppData) => Promise<void>;
 
   addTrade: (input: Omit<TradeInput, 'pnl' | 'status' | 'charges' | 'reviewNotes'> & Partial<TradeInput>) => void;
   updateTrade: (id: string, input: Partial<Trade>) => void;
+  /** Remove one screenshot and delete it from disk / Journal folder immediately. */
+  removeTradeImage: (tradeId: string, imageRef: string) => void;
   deleteTrade: (id: string) => void;
 
   addRule: (type: RuleType, text: string) => void;
@@ -200,6 +205,19 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     set({restoreAvailable: false});
   },
 
+  startFresh: async () => {
+    // Must succeed — do not reset the app if disk wipe failed
+    await wipeFolderBackupAndImages();
+    const defaults = createDefaultData();
+    await saveAppData(defaults);
+    set({
+      ...defaults,
+      restoreAvailable: false,
+      hydrated: true,
+      appUnlocked: false,
+    });
+  },
+
   restoreFromFolder: async data => {
     const migratedProfile = {
       displayName: data.profile?.displayName ?? '',
@@ -243,6 +261,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       targetPrice: input.targetPrice,
       reasonConditionIds: input.reasonConditionIds ?? [],
       strategyId: input.strategyId,
+      conditionScore: input.conditionScore,
+      conditionScoreMax: input.conditionScoreMax,
       emotion: input.emotion ?? 'Neutral',
       notes: input.notes ?? '',
       images: input.images ?? [],
@@ -251,6 +271,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       exitPrice: input.exitPrice,
       charges: input.charges ?? 0,
       pnl: input.pnl ?? 0,
+      pnlPercent: input.pnlPercent,
       reviewNotes: input.reviewNotes ?? '',
       reviewedAt: input.reviewedAt,
       createdAt: now,
@@ -261,6 +282,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   updateTrade: (id, input) => {
+    const prev = get().trades.find(t => t.id === id);
     set(s => ({
       trades: s.trades.map(t =>
         t.id === id
@@ -268,11 +290,54 @@ export const useJournalStore = create<JournalState>((set, get) => ({
           : t,
       ),
     }));
+    if (prev && input.images) {
+      const nextNames = new Set(
+        input.images.map(img => tradeImageFileName(img)),
+      );
+      const removed = (prev.images ?? []).filter(
+        img => !nextNames.has(tradeImageFileName(img)),
+      );
+      if (removed.length > 0) {
+        void deleteTradeImages(removed);
+      }
+    }
+    schedulePersist(get);
+  },
+
+  removeTradeImage: (tradeId, imageRef) => {
+    const name = tradeImageFileName(imageRef);
+    if (!name) {
+      return;
+    }
+    const trade = get().trades.find(t => t.id === tradeId);
+    if (!trade) {
+      void deleteTradeImages([name]);
+      return;
+    }
+    const nextImages = (trade.images ?? []).filter(
+      img => tradeImageFileName(img) !== name,
+    );
+    set(s => ({
+      trades: s.trades.map(t =>
+        t.id === tradeId
+          ? {
+              ...t,
+              images: nextImages,
+              updatedAt: new Date().toISOString(),
+            }
+          : t,
+      ),
+    }));
+    void deleteTradeImages([name]);
     schedulePersist(get);
   },
 
   deleteTrade: id => {
+    const trade = get().trades.find(t => t.id === id);
     set(s => ({trades: s.trades.filter(t => t.id !== id)}));
+    if (trade?.images?.length) {
+      void deleteTradeImages(trade.images);
+    }
     schedulePersist(get);
   },
 
