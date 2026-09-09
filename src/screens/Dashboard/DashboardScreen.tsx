@@ -2,12 +2,7 @@ import React, {useMemo, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {
-  format,
-  parseISO,
-  subDays,
-  subMonths,
-} from 'date-fns';
+import {parseISO} from 'date-fns';
 import {SafeScreen} from '../../components/SafeScreen';
 import {ScreenHeader} from '../../components/ScreenHeader';
 import {DateField} from '../../components/DateField';
@@ -23,40 +18,24 @@ import {
   type AppTypography,
   type ColorPalette,
 } from '../../theme';
-import {formatDisplayDate, formatINR, formatSignedINR, formatSignedPercent} from '../../utils/format';
+import {
+  formatDisplayDate,
+  formatINR,
+  formatSignedINR,
+  formatSignedPercent,
+} from '../../utils/format';
 import {
   computeStats,
   filterTradesByDateRange,
   pnlByStrategy,
 } from '../../utils/stats';
+import {
+  DATE_RANGE_PRESETS,
+  rangeForPreset,
+  type RangePreset,
+} from '../../utils/dateRange';
 import type {DashboardStackParamList} from '../../navigation/types';
 import {useRotatingQuote} from '../../hooks/useRotatingQuote';
-
-type RangePreset = 'day' | 'week' | 'month' | '3m' | 'custom';
-
-const PRESETS: {id: Exclude<RangePreset, 'custom'>; label: string}[] = [
-  {id: 'day', label: 'Day'},
-  {id: 'week', label: 'Week'},
-  {id: 'month', label: 'Month'},
-  {id: '3m', label: '3 Month'},
-];
-
-function rangeForPreset(
-  preset: Exclude<RangePreset, 'custom'>,
-): {from: string; to: string} {
-  const now = new Date();
-  const to = format(now, 'yyyy-MM-dd');
-  switch (preset) {
-    case 'day':
-      return {from: to, to};
-    case 'week':
-      return {from: format(subDays(now, 6), 'yyyy-MM-dd'), to};
-    case 'month':
-      return {from: format(subMonths(now, 1), 'yyyy-MM-dd'), to};
-    case '3m':
-      return {from: format(subMonths(now, 3), 'yyyy-MM-dd'), to};
-  }
-}
 
 function profileInitial(username?: string, displayName?: string): string {
   const source = (username || displayName || 'U').trim();
@@ -147,7 +126,7 @@ export function DashboardScreen() {
         keyboardShouldPersistTaps="handled">
         <FadeSlideIn delay={30}>
           <View style={styles.presetRow}>
-            {PRESETS.map(item => (
+            {DATE_RANGE_PRESETS.map(item => (
               <ContextFilterChip
                 key={item.id}
                 label={item.label}
