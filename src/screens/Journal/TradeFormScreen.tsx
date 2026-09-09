@@ -226,7 +226,12 @@ export function TradeFormScreen({navigation, route}: Props) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag">
-        <DateField label="Date" required value={date} onChange={setDate} />
+        <DateField
+          label="Entry date"
+          required
+          value={date}
+          onChange={setDate}
+        />
         <Input
           label="Stock name"
           required

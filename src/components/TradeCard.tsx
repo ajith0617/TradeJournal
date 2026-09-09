@@ -4,7 +4,9 @@ import type {Trade} from '../types';
 import {radius, spacing, useThemedStyles} from '../theme';
 import {
   calcPnlPercent,
+  calcTradeHoldDays,
   formatDisplayDate,
+  formatHoldDays,
   formatSignedINR,
   formatSignedPercent,
 } from '../utils/format';
@@ -22,6 +24,9 @@ export function TradeCard({trade, strategyName, onPress}: Props) {
   const pnlPercent = !isOpen
     ? (trade.pnlPercent ??
       calcPnlPercent(trade.pnl, trade.entryPrice, trade.quantity))
+    : null;
+  const holdDays = !isOpen
+    ? calcTradeHoldDays(trade.date, trade.exitDate)
     : null;
   const styles = useThemedStyles(({colors, typography}) =>
     StyleSheet.create({
@@ -172,7 +177,9 @@ export function TradeCard({trade, strategyName, onPress}: Props) {
             </View>
           </View>
           <Text style={styles.meta}>
-            {trade.direction} · {trade.segment} · {formatDisplayDate(trade.date)}
+            {trade.direction} · {trade.segment} ·{' '}
+            {formatDisplayDate(trade.date)}
+            {holdDays != null ? ` · ${formatHoldDays(holdDays)}` : ''}
           </Text>
         </View>
         {isOpen ? (

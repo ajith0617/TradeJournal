@@ -23,7 +23,8 @@ export type ConditionWeight = 'core' | 'minor';
 
 export interface Trade {
   id: string;
-  date: string; // ISO date YYYY-MM-DD
+  /** Entry date — ISO YYYY-MM-DD */
+  date: string;
   stockName: string;
   segment: Segment;
   direction: Direction;
@@ -55,6 +56,8 @@ export interface Trade {
   outcome?: TradeOutcome;
   /** Actual or derived exit (manual exit, else target/SL) */
   exitPrice?: number;
+  /** Exit / close date — ISO YYYY-MM-DD (set on review) */
+  exitDate?: string;
   charges: number;
   pnl: number;
   /** How to improve */

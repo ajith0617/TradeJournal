@@ -1,4 +1,4 @@
-import {format, parseISO, isValid} from 'date-fns';
+import {format, parseISO, isValid, differenceInCalendarDays} from 'date-fns';
 
 export function formatINR(value: number): string {
   const sign = value < 0 ? '-' : '';
@@ -71,6 +71,44 @@ export function formatDisplayDate(isoDate: string): string {
   } catch {
     return isoDate;
   }
+}
+
+/**
+ * Calendar days from entry to exit.
+ * Same day → 0. Returns null if dates are missing/invalid or exit before entry.
+ */
+export function calcTradeHoldDays(
+  entryDate: string,
+  exitDate?: string,
+): number | null {
+  if (!entryDate?.trim() || !exitDate?.trim()) {
+    return null;
+  }
+  try {
+    const entry = parseISO(entryDate.trim());
+    const exit = parseISO(exitDate.trim());
+    if (!isValid(entry) || !isValid(exit)) {
+      return null;
+    }
+    const days = differenceInCalendarDays(exit, entry);
+    if (days < 0) {
+      return null;
+    }
+    return days;
+  } catch {
+    return null;
+  }
+}
+
+/** e.g. Same day / 1 day / 5 days */
+export function formatHoldDays(days: number): string {
+  if (days <= 0) {
+    return 'Same day';
+  }
+  if (days === 1) {
+    return '1 day';
+  }
+  return `${days} days`;
 }
 
 export function calcPnl(

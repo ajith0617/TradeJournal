@@ -7,9 +7,11 @@ import {
   View,
 } from 'react-native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {parseISO} from 'date-fns';
 import {SafeScreen} from '../../components/SafeScreen';
 import {Button} from '../../components/Button';
 import {Input} from '../../components/Input';
+import {DateField} from '../../components/DateField';
 import {FieldLabel} from '../../components/FieldLabel';
 import {useJournalStore} from '../../store/journalStore';
 import {
@@ -26,9 +28,11 @@ import {
   calcPnlPercent,
   calcTradedAmount,
   exitLevelForOutcome,
+  formatDisplayDate,
   formatINR,
   formatSignedINR,
   formatSignedPercent,
+  todayISO,
 } from '../../utils/format';
 import type {JournalStackParamList} from '../../navigation/types';
 
@@ -52,6 +56,9 @@ export function TradeReviewScreen({navigation, route}: Props) {
   const [outcome, setOutcome] = useState<TradeOutcome | undefined>(
     trade?.outcome,
   );
+  const [exitDate, setExitDate] = useState(
+    trade?.exitDate || todayISO(),
+  );
   const [exitPrice, setExitPrice] = useState(
     trade?.exitPrice != null ? String(trade.exitPrice) : '',
   );
@@ -63,6 +70,16 @@ export function TradeReviewScreen({navigation, route}: Props) {
   const exitRequired = trade
     ? isExitPriceRequired(trade.stopLoss, trade.targetPrice)
     : true;
+
+  const exitDateError = useMemo(() => {
+    if (!exitDate.trim()) {
+      return 'Exit date is required';
+    }
+    if (trade?.date && exitDate < trade.date) {
+      return 'Exit date cannot be before entry date';
+    }
+    return '';
+  }, [trade?.date, exitDate]);
 
   const preview = useMemo(() => {
     if (!trade || !outcome) {
@@ -126,7 +143,9 @@ export function TradeReviewScreen({navigation, route}: Props) {
     ? calcTradedAmount(trade.entryPrice, trade.quantity)
     : 0;
 
-  const canSave = Boolean(outcome && preview?.ready);
+  const canSave = Boolean(
+    outcome && preview?.ready && !exitDateError && exitDate.trim(),
+  );
 
   if (!trade) {
     return (
@@ -151,6 +170,7 @@ export function TradeReviewScreen({navigation, route}: Props) {
     updateTrade(trade.id, {
       outcome,
       exitPrice: preview.exit,
+      exitDate: exitDate.trim(),
       charges: ch,
       pnl: preview.pnl,
       pnlPercent: pct ?? undefined,
@@ -181,7 +201,7 @@ export function TradeReviewScreen({navigation, route}: Props) {
           {trade.direction}
         </Text>
         <Text style={styles.levels}>
-          Target{' '}
+          Entry date {formatDisplayDate(trade.date)} · Target{' '}
           {trade.targetPrice != null ? formatINR(trade.targetPrice) : '—'} · SL{' '}
           {trade.stopLoss != null ? formatINR(trade.stopLoss) : '—'}
         </Text>
@@ -217,6 +237,17 @@ export function TradeReviewScreen({navigation, route}: Props) {
             </Text>
           </Pressable>
         </View>
+
+        <DateField
+          label="Exit date"
+          required
+          value={exitDate}
+          onChange={setExitDate}
+          minimumDate={trade.date ? parseISO(trade.date) : undefined}
+        />
+        {exitDateError ? (
+          <Text style={styles.dateError}>{exitDateError}</Text>
+        ) : null}
 
         <Input
           label="Exit price (₹)"
@@ -335,6 +366,12 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     ...typography.caption,
     marginBottom: spacing.xl,
     marginTop: spacing.xs,
+  },
+  dateError: {
+    ...typography.caption,
+    color: colors.loss,
+    marginTop: -spacing.md,
+    marginBottom: spacing.lg,
   },
   outcomeRow: {
     flexDirection: 'row',

@@ -23,7 +23,9 @@ import {conditionWeightLabel, conditionWeightMarks, type ConditionWeight} from '
 import {
   calcPnlPercent,
   calcTradedAmount,
+  calcTradeHoldDays,
   formatDisplayDate,
+  formatHoldDays,
   formatINR,
   formatSignedINR,
   formatSignedPercent,
@@ -87,6 +89,9 @@ export function TradeDetailScreen({navigation, route}: Props) {
   const pnlPercent = !isOpen
     ? (trade.pnlPercent ??
       calcPnlPercent(trade.pnl, trade.entryPrice, trade.quantity))
+    : null;
+  const holdDays = !isOpen
+    ? calcTradeHoldDays(trade.date, trade.exitDate)
     : null;
 
   const onDelete = async () => {
@@ -168,12 +173,33 @@ export function TradeDetailScreen({navigation, route}: Props) {
             </Text>
           </View>
         )}
-        <Text style={styles.date}>{formatDisplayDate(trade.date)}</Text>
+        <Text style={styles.date}>
+          Entry {formatDisplayDate(trade.date)}
+          {!isOpen && trade.exitDate
+            ? ` · Exit ${formatDisplayDate(trade.exitDate)}`
+            : ''}
+          {holdDays != null ? ` · ${formatHoldDays(holdDays)}` : ''}
+        </Text>
 
         <View style={styles.grid}>
           <Row label="Segment" value={trade.segment} />
           <Row label="Direction" value={trade.direction} />
           <Row label="Quantity" value={String(trade.quantity)} />
+          <Row label="Entry date" value={formatDisplayDate(trade.date)} />
+          {!isOpen ? (
+            <Row
+              label="Exit date"
+              value={
+                trade.exitDate ? formatDisplayDate(trade.exitDate) : '—'
+              }
+            />
+          ) : null}
+          {!isOpen ? (
+            <Row
+              label="Days held"
+              value={holdDays != null ? formatHoldDays(holdDays) : '—'}
+            />
+          ) : null}
           <Row label="Entry" value={formatINR(trade.entryPrice)} />
           <Row
             label="Traded amount"

@@ -5,6 +5,7 @@ import {tradeImageFileName} from './tradeImages';
 import {resolveThemeId} from '../theme';
 import {createId} from '../utils/id';
 import {calcPnlPercent} from '../utils/format';
+import {format as formatDate, parseISO, isValid} from 'date-fns';
 
 const STORAGE_KEY = '@journal/app_data_v1';
 
@@ -174,6 +175,18 @@ function migrateAppData(data: AppData): AppData {
       status,
       outcome,
       exitPrice: anyT.exitPrice,
+      exitDate:
+        anyT.exitDate ||
+        (status === 'reviewed' && anyT.reviewedAt
+          ? (() => {
+              try {
+                const d = parseISO(anyT.reviewedAt);
+                return isValid(d) ? formatDate(d, 'yyyy-MM-dd') : undefined;
+              } catch {
+                return undefined;
+              }
+            })()
+          : undefined),
       charges: anyT.charges ?? 0,
       pnl: anyT.pnl ?? 0,
       pnlPercent:
