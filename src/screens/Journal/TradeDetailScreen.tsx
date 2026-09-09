@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -94,6 +94,9 @@ export function TradeDetailScreen({navigation, route}: Props) {
     ? calcTradeHoldDays(trade.date, trade.exitDate)
     : null;
 
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(true);
+
   const onDelete = async () => {
     const ok = await confirm({
       title: 'Delete trade?',
@@ -181,127 +184,201 @@ export function TradeDetailScreen({navigation, route}: Props) {
           {holdDays != null ? ` · ${formatHoldDays(holdDays)}` : ''}
         </Text>
 
-        <View style={styles.grid}>
-          <Row label="Segment" value={trade.segment} />
-          <Row label="Direction" value={trade.direction} />
-          <Row label="Quantity" value={String(trade.quantity)} />
-          <Row label="Entry date" value={formatDisplayDate(trade.date)} />
-          {!isOpen ? (
-            <Row
-              label="Exit date"
-              value={
-                trade.exitDate ? formatDisplayDate(trade.exitDate) : '—'
-              }
-            />
+        <View style={styles.collapseBlock}>
+          <Pressable
+            onPress={() => setDetailsOpen(v => !v)}
+            style={styles.collapseHeader}>
+            <Text style={styles.collapseTitle}>Trade details</Text>
+            <Text style={styles.collapseChevron}>
+              {detailsOpen ? '▾' : '▸'}
+            </Text>
+          </Pressable>
+          {detailsOpen ? (
+            <View style={styles.collapseBody}>
+              <View style={styles.grid}>
+                <Row label="Segment" value={trade.segment} />
+                <Row label="Direction" value={trade.direction} />
+                <Row label="Quantity" value={String(trade.quantity)} />
+                <Row label="Entry date" value={formatDisplayDate(trade.date)} />
+                {!isOpen ? (
+                  <Row
+                    label="Exit date"
+                    value={
+                      trade.exitDate
+                        ? formatDisplayDate(trade.exitDate)
+                        : '—'
+                    }
+                  />
+                ) : null}
+                {!isOpen ? (
+                  <Row
+                    label="Days held"
+                    value={
+                      holdDays != null ? formatHoldDays(holdDays) : '—'
+                    }
+                  />
+                ) : null}
+                <Row label="Entry" value={formatINR(trade.entryPrice)} />
+                <Row
+                  label="Traded amount"
+                  value={tradedAmt > 0 ? formatINR(tradedAmt) : '—'}
+                />
+                {!isOpen ? (
+                  <Row
+                    label="P&L %"
+                    value={
+                      pnlPercent == null
+                        ? '—'
+                        : formatSignedPercent(pnlPercent)
+                    }
+                  />
+                ) : null}
+                <Row
+                  label="Stop loss"
+                  value={
+                    trade.stopLoss != null ? formatINR(trade.stopLoss) : '—'
+                  }
+                />
+                <Row
+                  label="Target"
+                  value={
+                    trade.targetPrice != null
+                      ? formatINR(trade.targetPrice)
+                      : '—'
+                  }
+                />
+                {!isOpen ? (
+                  <>
+                    <Row
+                      label="Exit level"
+                      value={
+                        trade.exitPrice != null
+                          ? formatINR(trade.exitPrice)
+                          : '—'
+                      }
+                    />
+                    <Row
+                      label="Charges"
+                      value={
+                        trade.charges ? formatINR(trade.charges) : '—'
+                      }
+                    />
+                  </>
+                ) : null}
+                <Row label="Strategy" value={strategyName} />
+                <Row
+                  label="Setup mark"
+                  value={
+                    trade.conditionScoreMax != null &&
+                    trade.conditionScoreMax > 0
+                      ? `${trade.conditionScore ?? 0} / ${trade.conditionScoreMax}`
+                      : reasonItems.length > 0
+                        ? String(
+                            reasonItems.reduce(
+                              (sum, item) =>
+                                sum + conditionWeightMarks(item.weight),
+                              0,
+                            ),
+                          )
+                        : '—'
+                  }
+                />
+                <Row label="Emotion" value={trade.emotion} />
+              </View>
+
+              {reasonItems.length > 0 ? (
+                <View style={styles.reasonsInCollapse}>
+                  <Text style={styles.notesLabel}>Reasons to buy</Text>
+                  {reasonItems.map(item => (
+                    <View key={item.text} style={styles.reasonRow}>
+                      <Text
+                        style={[
+                          styles.reqBadge,
+                          item.weight === 'minor'
+                            ? styles.reqMinor
+                            : styles.reqCore,
+                        ]}>
+                        {conditionWeightLabel(item.weight)} ·{' '}
+                        {conditionWeightMarks(item.weight)}
+                      </Text>
+                      <Text style={styles.notes}>· {item.text}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
           ) : null}
-          {!isOpen ? (
-            <Row
-              label="Days held"
-              value={holdDays != null ? formatHoldDays(holdDays) : '—'}
-            />
-          ) : null}
-          <Row label="Entry" value={formatINR(trade.entryPrice)} />
-          <Row
-            label="Traded amount"
-            value={tradedAmt > 0 ? formatINR(tradedAmt) : '—'}
-          />
-          {!isOpen ? (
-            <Row
-              label="P&L %"
-              value={
-                pnlPercent == null ? '—' : formatSignedPercent(pnlPercent)
-              }
-            />
-          ) : null}
-          <Row
-            label="Stop loss"
-            value={
-              trade.stopLoss != null ? formatINR(trade.stopLoss) : '—'
-            }
-          />
-          <Row
-            label="Target"
-            value={
-              trade.targetPrice != null ? formatINR(trade.targetPrice) : '—'
-            }
-          />
-          {!isOpen ? (
-            <>
-              <Row
-                label="Exit level"
-                value={
-                  trade.exitPrice != null ? formatINR(trade.exitPrice) : '—'
-                }
-              />
-              <Row
-                label="Charges"
-                value={trade.charges ? formatINR(trade.charges) : '—'}
-              />
-            </>
-          ) : null}
-          <Row label="Strategy" value={strategyName} />
-          <Row
-            label="Setup mark"
-            value={
-              trade.conditionScoreMax != null && trade.conditionScoreMax > 0
-                ? `${trade.conditionScore ?? 0} / ${trade.conditionScoreMax}`
-                : reasonItems.length > 0
-                  ? String(
-                      reasonItems.reduce(
-                        (sum, item) => sum + conditionWeightMarks(item.weight),
-                        0,
-                      ),
-                    )
-                  : '—'
-            }
-          />
-          <Row label="Emotion" value={trade.emotion} />
         </View>
 
-        {reasonItems.length > 0 ? (
-          <View style={styles.notesBox}>
-            <Text style={styles.notesLabel}>Reasons to buy</Text>
-            {reasonItems.map(item => (
-              <View key={item.text} style={styles.reasonRow}>
-                <Text
-                  style={[
-                    styles.reqBadge,
-                    item.weight === 'minor' ? styles.reqMinor : styles.reqCore,
-                  ]}>
-                  {conditionWeightLabel(item.weight)} ·{' '}
-                  {conditionWeightMarks(item.weight)}
-                </Text>
-                <Text style={styles.notes}>· {item.text}</Text>
+        {trade.notes ||
+        (!isOpen && trade.reviewNotes) ||
+        trade.images.length > 0 ? (
+          <View style={styles.collapseBlock}>
+            <Pressable
+              onPress={() => setNotesOpen(v => !v)}
+              style={styles.collapseHeader}>
+              <Text style={styles.collapseTitle}>Notes & screenshots</Text>
+              <Text style={styles.collapseChevron}>
+                {notesOpen ? '▾' : '▸'}
+              </Text>
+            </Pressable>
+            {notesOpen ? (
+              <View style={styles.collapseBody}>
+                {trade.notes ? (
+                  <View style={[styles.noteCard, styles.entryNoteCard]}>
+                    <Text style={styles.noteEyebrow}>At entry</Text>
+                    <Text style={[styles.notesLabel, styles.entryNoteLabel]}>
+                      Entry notes
+                    </Text>
+                    <Text style={styles.notes}>{trade.notes}</Text>
+                  </View>
+                ) : null}
+
+                {!isOpen && trade.reviewNotes ? (
+                  <View
+                    style={[
+                      styles.noteCard,
+                      positive
+                        ? styles.reviewNoteCardWin
+                        : styles.reviewNoteCardLoss,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.noteEyebrow,
+                        positive
+                          ? styles.reviewNoteEyebrowWin
+                          : styles.reviewNoteEyebrowLoss,
+                      ]}>
+                      After exit
+                    </Text>
+                    <Text
+                      style={[
+                        styles.notesLabel,
+                        positive
+                          ? styles.reviewNoteLabelWin
+                          : styles.reviewNoteLabelLoss,
+                      ]}>
+                      Review notes
+                    </Text>
+                    <Text style={styles.notes}>{trade.reviewNotes}</Text>
+                  </View>
+                ) : null}
+
+                {trade.images.length > 0 ? (
+                  <View style={styles.screenshotsBlock}>
+                    <Text style={styles.notesLabel}>Screenshots</Text>
+                    <Text style={styles.zoomHint}>
+                      Tap to view · Tap × to delete from Journal folder
+                    </Text>
+                    <ScreenshotGallery
+                      images={trade.images}
+                      imageStyle={styles.image}
+                      onRemove={onRemoveImage}
+                    />
+                  </View>
+                ) : null}
               </View>
-            ))}
-          </View>
-        ) : null}
-
-        {trade.notes ? (
-          <View style={styles.notesBox}>
-            <Text style={styles.notesLabel}>Entry notes</Text>
-            <Text style={styles.notes}>{trade.notes}</Text>
-          </View>
-        ) : null}
-
-        {!isOpen && trade.reviewNotes ? (
-          <View style={styles.notesBox}>
-            <Text style={styles.notesLabel}>Review notes</Text>
-            <Text style={styles.notes}>{trade.reviewNotes}</Text>
-          </View>
-        ) : null}
-
-        {trade.images.length > 0 ? (
-          <View>
-            <Text style={styles.notesLabel}>Screenshots</Text>
-            <Text style={styles.zoomHint}>
-              Tap to view · Tap × to delete from Journal folder
-            </Text>
-            <ScreenshotGallery
-              images={trade.images}
-              imageStyle={styles.image}
-              onRemove={onRemoveImage}
-            />
+            ) : null}
           </View>
         ) : null}
 
@@ -415,13 +492,49 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     ...typography.bodyMuted,
     marginBottom: spacing.xl,
   },
-  grid: {
+  collapseBlock: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
+    marginBottom: spacing.lg,
+    overflow: 'hidden',
+  },
+  collapseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  collapseTitle: {
+    ...typography.subtitle,
+    fontSize: 15,
+  },
+  collapseChevron: {
+    ...typography.body,
+    color: colors.textMuted,
+    fontSize: 16,
+  },
+  collapseBody: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+  },
+  grid: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     padding: spacing.lg,
-    marginBottom: spacing.xl,
+    marginTop: spacing.md,
+  },
+  reasonsInCollapse: {
+    marginTop: spacing.lg,
+  },
+  screenshotsBlock: {
+    marginTop: spacing.sm,
   },
   row: {
     flexDirection: 'row',
@@ -437,12 +550,56 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     ...typography.body,
     fontWeight: '600',
   },
-  notesBox: {
-    marginBottom: spacing.xl,
+  noteCard: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderLeftWidth: 3,
+  },
+  entryNoteCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.borderSubtle,
+    borderLeftColor: colors.textDim,
+  },
+  reviewNoteCardWin: {
+    backgroundColor: colors.accentMuted,
+    borderColor: colors.borderSubtle,
+    borderLeftColor: colors.profit,
+  },
+  reviewNoteCardLoss: {
+    backgroundColor: colors.lossMuted,
+    borderColor: colors.borderSubtle,
+    borderLeftColor: colors.loss,
+  },
+  noteEyebrow: {
+    ...typography.caption,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: colors.textDim,
+    marginBottom: 2,
+  },
+  reviewNoteEyebrowWin: {
+    color: colors.profit,
+  },
+  reviewNoteEyebrowLoss: {
+    color: colors.loss,
   },
   notesLabel: {
     ...typography.label,
     marginBottom: spacing.sm,
+  },
+  entryNoteLabel: {
+    color: colors.textMuted,
+  },
+  reviewNoteLabelWin: {
+    color: colors.profit,
+  },
+  reviewNoteLabelLoss: {
+    color: colors.loss,
   },
   zoomHint: {
     ...typography.caption,
