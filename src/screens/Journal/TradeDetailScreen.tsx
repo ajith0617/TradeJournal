@@ -181,11 +181,16 @@ export function TradeDetailScreen({navigation, route}: Props) {
                 : trade.outcome === 'loss'
                   ? 'Reviewed · Loss'
                   : 'Reviewed'}
+            {trade.isPaper ? ' · Paper' : ''}
           </Text>
         </View>
 
         {isOpen ? (
-          <Text style={styles.openHint}>Open trade — review when you exit</Text>
+          <Text style={styles.openHint}>
+            {trade.isPaper
+              ? 'Paper trade — practice only, not on Dashboard'
+              : 'Open trade — review when you exit'}
+          </Text>
         ) : (
           <View>
             <Text style={[styles.pnl, positive ? styles.profit : styles.loss]}>

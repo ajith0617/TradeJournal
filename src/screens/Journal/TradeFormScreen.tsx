@@ -52,9 +52,11 @@ const EMOTIONS: Emotion[] = [
 export function TradeFormScreen({navigation, route}: Props) {
   const styles = useThemedStyles(t => createStyles(t.colors, t.typography));
   const tradeId = route.params?.tradeId;
+  const isPaperNew = route.params?.isPaper === true;
   const existing = useJournalStore(s =>
     tradeId ? s.trades.find(t => t.id === tradeId) : undefined,
   );
+  const isPaper = existing?.isPaper === true || (!existing && isPaperNew);
   const strategies = useJournalStore(s => s.strategies);
   const addTrade = useJournalStore(s => s.addTrade);
   const updateTrade = useJournalStore(s => s.updateTrade);
@@ -200,6 +202,7 @@ export function TradeFormScreen({navigation, route}: Props) {
       exitPrice: existing?.exitPrice,
       outcome: existing?.outcome,
       reviewedAt: existing?.reviewedAt,
+      isPaper,
     };
 
     if (existing) {
@@ -217,7 +220,13 @@ export function TradeFormScreen({navigation, route}: Props) {
           <Text style={styles.back}>← Back</Text>
         </Pressable>
         <Text style={styles.title}>
-          {existing ? 'Edit entry' : 'Take trade'}
+          {existing
+            ? isPaper
+              ? 'Edit paper entry'
+              : 'Edit entry'
+            : isPaper
+              ? 'Paper trade'
+              : 'Take trade'}
         </Text>
         <View style={{width: 48}} />
       </View>

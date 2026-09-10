@@ -20,6 +20,7 @@ interface Props {
 
 export function TradeCard({trade, strategyName, onPress}: Props) {
   const isOpen = trade.status === 'open';
+  const isPaper = trade.isPaper === true;
   const positive = trade.pnl >= 0;
   const pnlPercent = !isOpen
     ? (trade.pnlPercent ??
@@ -79,6 +80,12 @@ export function TradeCard({trade, strategyName, onPress}: Props) {
       },
       badgeTextReviewed: {
         color: colors.accent,
+      },
+      badgePaper: {
+        backgroundColor: 'rgba(240, 180, 41, 0.15)',
+      },
+      badgeTextPaper: {
+        color: colors.warning,
       },
       meta: {
         ...typography.caption,
@@ -175,6 +182,13 @@ export function TradeCard({trade, strategyName, onPress}: Props) {
                 {isOpen ? 'Not reviewed' : 'Reviewed'}
               </Text>
             </View>
+            {isPaper ? (
+              <View style={[styles.badge, styles.badgePaper]}>
+                <Text style={[styles.badgeText, styles.badgeTextPaper]}>
+                  Paper
+                </Text>
+              </View>
+            ) : null}
           </View>
           <Text style={styles.meta}>
             {trade.direction} · {trade.segment} ·{' '}

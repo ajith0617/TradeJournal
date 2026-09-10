@@ -63,6 +63,11 @@ export interface Trade {
   /** How to improve */
   reviewNotes: string;
   reviewedAt?: string;
+  /**
+   * Paper / practice trade — isolated from live journal filters and Dashboard.
+   * Missing or false = live trade.
+   */
+  isPaper?: boolean;
   createdAt: string;
   updatedAt: string;
 }

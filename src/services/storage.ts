@@ -202,6 +202,7 @@ function migrateAppData(data: AppData): AppData {
       images: (anyT.images ?? []).map((img: string) => tradeImageFileName(img)),
       notes: anyT.notes ?? '',
       emotion: anyT.emotion ?? 'Neutral',
+      isPaper: Boolean(anyT.isPaper),
     } as Trade;
   });
 

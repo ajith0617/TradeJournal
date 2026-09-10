@@ -33,7 +33,7 @@ import {
   type AppTypography,
   type ColorPalette,
 } from '../../theme';
-import {filterTradesByDateRange} from '../../utils/stats';
+import {filterTradesByDateRange, isLiveTrade, isPaperTrade} from '../../utils/stats';
 import {
   DATE_RANGE_PRESETS,
   rangeForPreset,
@@ -42,12 +42,12 @@ import {
 import type {JournalStackParamList} from '../../navigation/types';
 import {useRotatingQuote} from '../../hooks/useRotatingQuote';
 
-type Filter = 'all' | 'open' | 'reviewed' | 'win' | 'loss';
+type Filter = 'all' | 'open' | 'reviewed' | 'win' | 'loss' | 'paper';
 /** `date` = same take-order as All/Reviewed; P&L only after Low/High */
 type PnlSort = 'date' | 'asc' | 'desc';
 
-const FILTERS: {
-  id: Filter;
+const LIVE_FILTERS: {
+  id: Exclude<Filter, 'paper'>;
   label: string;
   tone: FilterTone;
   heading: string;
@@ -84,6 +84,13 @@ const FILTERS: {
   },
 ];
 
+const PAPER_FILTER = {
+  id: 'paper' as const,
+  label: 'Paper trade',
+  tone: 'pending' as FilterTone,
+  heading: 'Practice only — never counted on Dashboard',
+};
+
 function shortDate(iso: string): string {
   try {
     return format(parseISO(iso), 'dd MMM');
@@ -108,7 +115,7 @@ function rangeButtonLabel(
 export function JournalListScreen() {
   const {colors} = useTheme();
   const insets = useSafeAreaInsets();
-  const quote = useRotatingQuote();
+  const {quote, nextQuote} = useRotatingQuote();
   const navigation =
     useNavigation<NativeStackNavigationProp<JournalStackParamList>>();
   const styles = useThemedStyles(t => createStyles(t.colors, t.typography));
@@ -123,8 +130,12 @@ export function JournalListScreen() {
   const [toDate, setToDate] = useState(initial.to);
   const [dateSheetOpen, setDateSheetOpen] = useState(false);
 
-  const activeFilter = FILTERS.find(f => f.id === filter) ?? FILTERS[0];
+  const activeFilter =
+    filter === 'paper'
+      ? PAPER_FILTER
+      : (LIVE_FILTERS.find(f => f.id === filter) ?? LIVE_FILTERS[0]);
   const isAll = filter === 'all';
+  const isPaper = filter === 'paper';
   const showPnlSort = filter === 'win' || filter === 'loss';
   const subtitle = isAll ? quote : activeFilter.heading;
 
@@ -173,16 +184,20 @@ export function JournalListScreen() {
       return [];
     }
     const inRange = filterTradesByDateRange(trades, fromDate, toDate);
+    if (filter === 'paper') {
+      return inRange.filter(isPaperTrade);
+    }
+    const live = inRange.filter(isLiveTrade);
     let list =
       filter === 'open'
-        ? inRange.filter(t => t.status === 'open')
+        ? live.filter(t => t.status === 'open')
         : filter === 'reviewed'
-          ? inRange.filter(t => t.status === 'reviewed')
+          ? live.filter(t => t.status === 'reviewed')
           : filter === 'win'
-            ? inRange.filter(t => t.status === 'reviewed' && t.pnl > 0)
+            ? live.filter(t => t.status === 'reviewed' && t.pnl > 0)
             : filter === 'loss'
-              ? inRange.filter(t => t.status === 'reviewed' && t.pnl < 0)
-              : inRange;
+              ? live.filter(t => t.status === 'reviewed' && t.pnl < 0)
+              : live;
 
     if (
       (filter === 'win' || filter === 'loss') &&
@@ -203,10 +218,19 @@ export function JournalListScreen() {
   };
 
   const listKey = `${filter}:${pnlSort}:${fromDate}:${toDate}`;
-  const openTradeForm = () => navigation.navigate('TradeForm', {});
+  const openTradeForm = () =>
+    navigation.navigate('TradeForm', isPaper ? {isPaper: true} : {});
   const dateLabel = rangeButtonLabel(preset, fromDate, toDate);
   const sortTone: FilterTone =
     filter === 'win' ? 'profit' : filter === 'loss' ? 'loss' : 'neutral';
+  const emptyTitle = isPaper
+    ? 'No paper trades in this range'
+    : 'No trades in this range';
+  const emptyMessage = isPaper
+    ? 'Practice entries stay here only — they never hit Dashboard.'
+    : 'Try another date range, or log a trade for these dates.';
+  const emptyAction = isPaper ? 'Paper trade' : 'Take trade';
+  const fabLabel = isPaper ? 'Add paper trade' : 'Add trade';
 
   return (
     <SafeScreen>
@@ -216,36 +240,62 @@ export function JournalListScreen() {
           subtitle={subtitle}
           subtitleColor={headingColor}
           emphasizeSubtitle={isAll}
+          onSubtitlePress={isAll ? nextQuote : undefined}
           right={
-            <Pressable
-              onPress={() => setDateSheetOpen(true)}
-              style={styles.dateBtn}
-              accessibilityLabel={`Date range ${dateLabel}. Change dates.`}>
-              <Text style={styles.dateBtnLabel} numberOfLines={1}>
-                {dateLabel}
-              </Text>
-              <Text style={styles.dateBtnChevron}>▾</Text>
-            </Pressable>
+            <View style={styles.headerActions}>
+              {!isPaper ? (
+                <Pressable
+                  onPress={() => selectFilter('paper')}
+                  style={styles.paperEntry}
+                  hitSlop={8}
+                  accessibilityLabel="Open paper trades">
+                  <Text style={styles.paperEntryText}>Paper</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => setDateSheetOpen(true)}
+                style={styles.dateBtn}
+                accessibilityLabel={`Date range ${dateLabel}. Change dates.`}>
+                <Text style={styles.dateBtnLabel} numberOfLines={1}>
+                  {dateLabel}
+                </Text>
+                <Text style={styles.dateBtnChevron}>▾</Text>
+              </Pressable>
+            </View>
           }
         />
 
-        <FadeSlideIn delay={40}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filtersScroll}
-            contentContainerStyle={styles.filters}>
-            {FILTERS.map(item => (
-              <ContextFilterChip
-                key={item.id}
-                label={item.label}
-                tone={item.tone}
-                active={filter === item.id}
-                onPress={() => selectFilter(item.id)}
-              />
-            ))}
-          </ScrollView>
-        </FadeSlideIn>
+        {isPaper ? (
+          <FadeSlideIn delay={40} trigger="paper">
+            <View style={styles.paperBar}>
+              <Pressable
+                onPress={() => selectFilter('all')}
+                style={styles.liveBack}
+                accessibilityLabel="Back to live journal">
+                <Text style={styles.liveBackText}>← Live journal</Text>
+              </Pressable>
+              <Text style={styles.paperBarLabel}>Paper trade</Text>
+            </View>
+          </FadeSlideIn>
+        ) : (
+          <FadeSlideIn delay={40}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filtersScroll}
+              contentContainerStyle={styles.filters}>
+              {LIVE_FILTERS.map(item => (
+                <ContextFilterChip
+                  key={item.id}
+                  label={item.label}
+                  tone={item.tone}
+                  active={filter === item.id}
+                  onPress={() => selectFilter(item.id)}
+                />
+              ))}
+            </ScrollView>
+          </FadeSlideIn>
+        )}
 
         {showPnlSort ? (
           <FadeSlideIn delay={60} trigger={filter}>
@@ -275,9 +325,9 @@ export function JournalListScreen() {
           ListEmptyComponent={
             <FadeSlideIn trigger={listKey}>
               <EmptyState
-                title="No trades in this range"
-                message="Try another date range, or log a trade for these dates."
-                actionLabel="Take trade"
+                title={emptyTitle}
+                message={emptyMessage}
+                actionLabel={emptyAction}
                 onAction={openTradeForm}
               />
             </FadeSlideIn>
@@ -301,7 +351,7 @@ export function JournalListScreen() {
           )}
         />
 
-        <FabButton onPress={openTradeForm} accessibilityLabel="Add trade" />
+        <FabButton onPress={openTradeForm} accessibilityLabel={fabLabel} />
 
         <Modal
           visible={dateSheetOpen}
@@ -389,6 +439,20 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     root: {
       flex: 1,
     },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    paperEntry: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+    },
+    paperEntryText: {
+      ...typography.caption,
+      color: colors.textMuted,
+      fontWeight: '600',
+    },
     dateBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -421,6 +485,28 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
       gap: spacing.sm,
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.xs,
+    },
+    paperBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.sm,
+      gap: spacing.md,
+    },
+    liveBack: {
+      paddingVertical: spacing.sm,
+      paddingRight: spacing.sm,
+    },
+    liveBackText: {
+      ...typography.caption,
+      color: colors.accent,
+      fontWeight: '700',
+    },
+    paperBarLabel: {
+      ...typography.caption,
+      color: colors.warning,
+      fontWeight: '700',
     },
     sortRow: {
       flexDirection: 'row',

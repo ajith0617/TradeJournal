@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import {Animated, StyleSheet, Text, View} from 'react-native';
+import {Animated, Pressable, StyleSheet, Text, View} from 'react-native';
 import {spacing, useThemedStyles} from '../theme';
 import {motion} from '../animation/tokens';
 import {DynamicDescription} from './DynamicDescription';
@@ -12,6 +12,8 @@ interface Props {
   subtitleColor?: string;
   /** Stronger animated description (rotating quotes) */
   emphasizeSubtitle?: boolean;
+  /** Tap subtitle (e.g. advance rotating quote) */
+  onSubtitlePress?: () => void;
 }
 
 /** Header with title entrance + focusable dynamic subtitle. */
@@ -21,6 +23,7 @@ export function ScreenHeader({
   right,
   subtitleColor,
   emphasizeSubtitle = false,
+  onSubtitlePress,
 }: Props) {
   const styles = useThemedStyles(({typography}) =>
     StyleSheet.create({
@@ -73,11 +76,25 @@ export function ScreenHeader({
           <Text style={styles.title}>{title}</Text>
         </Animated.View>
         {subtitle ? (
-          <DynamicDescription
-            text={subtitle}
-            color={subtitleColor}
-            emphasize={emphasizeSubtitle}
-          />
+          onSubtitlePress ? (
+            <Pressable
+              onPress={onSubtitlePress}
+              accessibilityRole="button"
+              accessibilityLabel="Show next quote"
+              hitSlop={8}>
+              <DynamicDescription
+                text={subtitle}
+                color={subtitleColor}
+                emphasize={emphasizeSubtitle}
+              />
+            </Pressable>
+          ) : (
+            <DynamicDescription
+              text={subtitle}
+              color={subtitleColor}
+              emphasize={emphasizeSubtitle}
+            />
+          )
         ) : null}
       </View>
       {right}

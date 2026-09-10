@@ -86,7 +86,7 @@ export function RulesScreen() {
         .sort((a, b) => a.order - b.order),
     [rules, ruleTab],
   );
-  const quote = useRotatingQuote();
+  const {quote, nextQuote} = useRotatingQuote();
   const rulesHeading =
     ruleTab === 'pre'
       ? 'Pre-market — prepare before the open'
@@ -210,6 +210,7 @@ export function RulesScreen() {
         title="Rules"
         subtitle={quote}
         emphasizeSubtitle
+        onSubtitlePress={nextQuote}
         right={
           <Pressable onPress={openCreate} style={styles.addBtn}>
             <Text style={styles.addText}>+ Strategy</Text>

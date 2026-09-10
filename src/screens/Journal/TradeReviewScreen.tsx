@@ -187,7 +187,9 @@ export function TradeReviewScreen({navigation, route}: Props) {
         <Pressable onPress={() => navigation.goBack()}>
           <Text style={styles.back}>← Back</Text>
         </Pressable>
-        <Text style={styles.title}>Review trade</Text>
+        <Text style={styles.title}>
+          {trade?.isPaper ? 'Review paper trade' : 'Review trade'}
+        </Text>
         <View style={{width: 48}} />
       </View>
 

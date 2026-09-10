@@ -1,6 +1,14 @@
 import type {Trade} from '../types';
 import {calcTradedAmount} from './format';
 
+export function isPaperTrade(trade: Trade): boolean {
+  return trade.isPaper === true;
+}
+
+export function isLiveTrade(trade: Trade): boolean {
+  return !isPaperTrade(trade);
+}
+
 /** Inclusive YYYY-MM-DD range filter */
 export function filterTradesByDateRange(
   trades: Trade[],
@@ -20,9 +28,11 @@ export function filterTradesByDateRange(
   });
 }
 
-/** Stats only use reviewed (closed) trades so open positions don't skew win rate */
+/** Stats only use reviewed live trades so open/paper don't skew win rate */
 export function computeStats(trades: Trade[]) {
-  const closed = trades.filter(t => t.status === 'reviewed');
+  const closed = trades.filter(
+    t => t.status === 'reviewed' && isLiveTrade(t),
+  );
   const count = closed.length;
   const netPnl = closed.reduce((s, t) => s + t.pnl, 0);
   const tradedAmount = closed.reduce(
@@ -63,7 +73,7 @@ export function pnlByStrategy(
   trades: Trade[],
   strategies: {id: string; name: string}[],
 ): {name: string; pnl: number; pnlPercent: number | null; count: number}[] {
-  const closed = trades.filter(t => t.status === 'reviewed');
+  const closed = trades.filter(t => t.status === 'reviewed' && isLiveTrade(t));
   const map = new Map<
     string,
     {name: string; pnl: number; traded: number; count: number}

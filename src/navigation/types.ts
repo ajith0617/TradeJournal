@@ -1,6 +1,6 @@
 export type JournalStackParamList = {
   JournalList: undefined;
-  TradeForm: {tradeId?: string};
+  TradeForm: {tradeId?: string; isPaper?: boolean};
   TradeReview: {tradeId: string};
   TradeDetail: {tradeId: string};
 };

@@ -10,10 +10,11 @@
 
 1. Log a trade **at entry** (stock, segment, direction, **entry date**, prices, strategy conditions with marks, emotion, screenshots).
 2. **Review on exit** (win/loss, **exit date**, exit price, charges, review notes) → P&amp;L ₹ and **P&amp;L %** are computed and stored; **days held** is derived from entry → exit.
-3. Track **strategies** (conditions: **Core = 2 marks**, **Minor = 1 mark**) and **pre/post market daily reminders**.
-4. View **Dashboard** stats for a date range (net P&amp;L, %, traded amount, by strategy).
-5. Sign in with a **local username/password** (password **show/hide**), optional **fingerprint lock** on cold start.
-6. Persist data in **AsyncStorage** and **backup/restore** under `Download/Journal/` so data survives reinstall. **Start fresh** can wipe the folder backup + images (with confirm + All files access).
+3. Optionally keep **Paper trades** (practice) in an isolated journal list — never counted on Dashboard.
+4. Track **strategies** (conditions: **Core = 2 marks**, **Minor = 1 mark**) and **pre/post market daily reminders**.
+5. View **Dashboard** stats for a date range (net P&amp;L, %, traded amount, by strategy) — **live trades only**.
+6. Sign in with a **local username/password** (password **show/hide**), optional **fingerprint lock** on cold start.
+7. Persist data in **AsyncStorage** and **backup/restore** under `Download/Journal/` so data survives reinstall. **Start fresh** can wipe the folder backup + images (with confirm + All files access).
 
 There is **no cloud backend** in the current codebase. Auth and data stay on device.
 
@@ -119,7 +120,7 @@ Custom swipeable tabs. **Initial / home tab: `DashboardTab`.**
 | Screen | Params | File |
 |--------|--------|------|
 | `JournalList` | — | `src/screens/Journal/JournalListScreen.tsx` |
-| `TradeForm` | `{ tradeId?: string }` | `src/screens/Journal/TradeFormScreen.tsx` |
+| `TradeForm` | `{ tradeId?: string; isPaper?: boolean }` | `src/screens/Journal/TradeFormScreen.tsx` |
 | `TradeReview` | `{ tradeId: string }` | `src/screens/Journal/TradeReviewScreen.tsx` |
 | `TradeDetail` | `{ tradeId: string }` | `src/screens/Journal/TradeDetailScreen.tsx` |
 
@@ -142,12 +143,12 @@ Param types: `src/navigation/types.ts`.
 ### Main
 | Screen | Role |
 |--------|------|
-| **Dashboard** | Shared date presets (Day/Week/Month/3M + custom); Net P&amp;L ₹ + **%** + **traded amount**; avg win/loss; wins/losses; P&amp;L + % by strategy; rotating quote; profile avatar → Profile |
+| **Dashboard** | Shared date presets (Day/Week/Month/3M + custom); Net P&amp;L ₹ + **%** + **traded amount** (**live trades only**); avg win/loss; wins/losses; P&amp;L + % by strategy; **tap rotating quote** for next; profile avatar → Profile |
 | **Profile** | Username/password (eye toggles); theme picker; fingerprint; folder backup; logout. Collapsible sections |
-| **Rules** | Collapsible Strategies (default open) + CRUD modal (**Mandatory type**: Core · 2 / Minor · 1); collapsible Daily reminders (default closed) |
-| **Journal list** | Compact **date pill** in header → bottom sheet (presets + From/To); status chips All / Not reviewed / Reviewed / Wins / Losses; cards show P&amp;L ₹/%, setup mark, **hold days**; FAB + |
-| **Trade form** | Create/edit entry; **Entry date**; strategy conditions + live **Setup mark**; screenshots; `SafeScreen keyboardAvoiding` |
-| **Trade detail** | Hero P&amp;L; collapsible **Trade details**; collapsible **Notes & screenshots** (entry vs review notes styled differently); delete trade/image confirms |
+| **Rules** | Collapsible Strategies (default open) + CRUD modal (**Mandatory type**: Core · 2 / Minor · 1); collapsible Daily reminders (default closed); **tap quote** for next |
+| **Journal list** | Compact **date pill** + muted **Paper** entry (header); live chips All / Not reviewed / Reviewed / Wins / Losses; Wins/Losses optional **P&amp;L Low→High / High→Low** (default take-order); **Paper trade** mode via header (isolated list, ← Live journal to exit); FAB + |
+| **Trade form** | Create/edit entry; **Entry date**; strategy conditions + live **Setup mark**; screenshots; paper mode title when `isPaper` |
+| **Trade detail** | Hero P&amp;L; collapsible **Trade details** (SL/Target show ₹ risk/reward on same line); collapsible **Notes & screenshots**; paper badge in status |
 | **Trade review** | Win/Loss; **Exit date** (required, ≥ entry); exit price; charges; review notes; live P&amp;L ₹/% + traded amount |
 
 Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
@@ -179,20 +180,23 @@ Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
 | `notes` | Entry notes |
 | `reviewNotes` | After-exit notes |
 | `status` / `outcome?` / `exitPrice?` / `charges` / `reviewedAt?` | Review lifecycle |
+| `isPaper?` | `true` = **paper / practice** trade; omitted/`false` = live. Migrated via `Boolean(isPaper)` |
 
 ### Other entities
 - **`Strategy`**: name, description, `conditions[]` (`id`, `text`, `weight`)
 - **`TradingRule`**: `type` pre/post, `text`, `order`
 - **`RuleCheckState`**: `{ date, completedRuleIds[] }`
 - **`UserProfile`**: includes `themeId`: `dark` \| `light` \| `ocean` \| `slate`
-- **`AppData`**: `trades`, `rules`, `strategies`, `ruleChecks`, `profile`, `lastSyncedAt?`
+- **`AppData`**: `trades`, `rules`, `strategies`, `ruleChecks`, `profile`, `lastSyncedAt?` — paper and live share one `trades[]`
 
 ### Money & duration helpers (`src/utils/format.ts`)
 - `calcPnl`, `calcTradedAmount`, `calcPnlPercent`, `formatSignedPercent`
 - `calcTradeHoldDays(entry, exit)`, `formatHoldDays` → `Same day` / `1 day` / `N days`
 
 ### Stats (`src/utils/stats.ts`)
-Reviewed trades only for net P&amp;L / win rate / **netPnlPercent** / **tradedAmount**; `pnlByStrategy` includes per-strategy %.
+- `isPaperTrade` / `isLiveTrade`
+- `computeStats` / `pnlByStrategy` use **reviewed live** trades only (paper excluded)
+- Dashboard date filter also `.filter(isLiveTrade)` before stats
 
 ### Shared date ranges (`src/utils/dateRange.ts`)
 `DATE_RANGE_PRESETS`, `rangeForPreset`, `RangePreset` — used by **Dashboard** and **Journal list**.
@@ -227,7 +231,7 @@ Reviewed trades only for net P&amp;L / win rate / **netPnlPercent** / **tradedAm
 
 | File | Responsibility |
 |------|----------------|
-| `src/services/storage.ts` | AsyncStorage `@journal/app_data_v1`; defaults; `migrateAppData` (weights, `pnlPercent`, `exitDate` from `reviewedAt`, image filenames) |
+| `src/services/storage.ts` | AsyncStorage `@journal/app_data_v1`; defaults; `migrateAppData` (weights, `pnlPercent`, `exitDate`, **`isPaper`**, image filenames) |
 | `src/services/folderBackup.ts` | Write/read backup; **`wipeFolderBackupAndImages`** (requires All files access; verifies wipe) |
 | `src/services/tradeImages.ts` | Persist / display / backup / restore; **`deleteTradeImages`**, `clearLocalTradeImages`, `clearJournalFolderImages` |
 | `src/services/auth.ts` | Credentials + username/password validators |
@@ -276,27 +280,37 @@ Shared helpers in `src/utils/dateRange.ts`.
 
 Default: **Month**.
 
-**Journal UX:** date control is a **header pill** (e.g. `Month` or `12 Aug – 9 Sep`) opening a **bottom sheet** — status chips stay as one compact row so the list keeps screen space.
+**Journal UX:** date control is a **header pill** (e.g. `Month` or `12 Aug – 9 Sep`) opening a **bottom sheet**. Muted **Paper** text beside the pill opens paper mode (not a permanent filter chip).
 
-### Journal status filters
+### Journal status filters (live only)
 | Filter | Meaning |
 |--------|---------|
-| All | All trades in date range; header rotating quote |
-| Not reviewed | `status === 'open'` |
-| Reviewed | `status === 'reviewed'` |
-| Wins | reviewed && `pnl > 0` |
-| Losses | reviewed && `pnl < 0` |
+| All | Live trades in date range; header rotating quote (**tap** → next quote) |
+| Not reviewed | live && `status === 'open'` |
+| Reviewed | live && `status === 'reviewed'` |
+| Wins | live && reviewed && `pnl > 0`; optional **P&amp;L** Low→High / High→Low (default = take-order; re-tap Wins resets) |
+| Losses | live && reviewed && `pnl < 0`; same optional P&amp;L sort |
 
-Cards show: status, entry date, **hold days** (reviewed), P&amp;L ₹ + %, setup mark chip, strategy, thumbs.
+Paper trades **never** appear in these chips.
+
+### Paper trade mode
+- Entry: header **Paper** (hidden while already in paper mode)
+- List: only `isPaper === true`, same date range pill
+- FAB → `TradeForm({ isPaper: true })`; review/detail same stack, preserved `isPaper`
+- Exit: **← Live journal**
+- Cards show a **Paper** badge; Dashboard / live filters / stats ignore them
 
 ### Strategy conditions & setup mark
 - UI label: **Mandatory type**
 - Options: **Core · 2**, **Minor · 1** (Secondary removed)
 - Trade form shows live **Setup mark** `score / max`; persisted as `conditionScore` / `conditionScoreMax`
 
+### Rotating quotes
+`useRotatingQuote` — auto-rotate ~12s; **`nextQuote`** on subtitle tap (Dashboard, Rules, Journal All). Timer restarts after tap.
+
 ### Trade detail layout
-1. Status + P&amp;L hero (always visible)
-2. Collapsible **Trade details** (default **closed**) — grid + reasons
+1. Status + P&amp;L hero (always visible); paper noted in status when applicable
+2. Collapsible **Trade details** (default **closed**) — grid + reasons; **Stop loss / Target** show price · potential ₹ (green/red)
 3. Collapsible **Notes & screenshots** (default **open** if any content)
    - Entry notes: neutral “At entry” card
    - Review notes: win/loss tinted “After exit” card
@@ -421,9 +435,9 @@ Cold start
   → Login (local, show/hide password)
   → (optional) Fingerprint
   → Tabs: Rules | Dashboard* | Journal
-       Dashboard → date range stats (₹, %, traded) + Profile
-       Journal → date pill + status filters → Form / Detail / Review
-       Rules → Strategies (Core/Minor marks) + Daily checklist
+       Dashboard → date range stats (₹, %, traded; live only) + tap quote + Profile
+       Journal → date pill + Paper (header) + live filters / paper mode → Form / Detail / Review
+       Rules → Strategies (Core/Minor marks) + Daily checklist + tap quote
 ```
 
 `*` = default tab.
@@ -443,6 +457,10 @@ Recent product/code updates reflected in this document:
 - Entry date / exit date / hold days
 - Trade detail collapsible sections; differentiated entry vs review notes
 - Screenshot delete only from full-screen viewer
+- Stop loss / Target potential ₹ on trade detail
+- Wins/Losses optional P&amp;L sort (default take-order)
+- Tap rotating quote to advance
+- **Paper trade** (`isPaper`) — header entry, isolated list, excluded from Dashboard/live filters
 
 ---
 

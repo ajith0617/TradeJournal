@@ -27,6 +27,7 @@ import {
 import {
   computeStats,
   filterTradesByDateRange,
+  isLiveTrade,
   pnlByStrategy,
 } from '../../utils/stats';
 import {
@@ -86,7 +87,9 @@ export function DashboardScreen() {
     if (rangeError) {
       return [];
     }
-    return filterTradesByDateRange(trades, fromDate, toDate);
+    return filterTradesByDateRange(trades, fromDate, toDate).filter(
+      isLiveTrade,
+    );
   }, [trades, fromDate, toDate, rangeError]);
 
   const stats = useMemo(() => computeStats(filtered), [filtered]);
@@ -94,7 +97,7 @@ export function DashboardScreen() {
     () => pnlByStrategy(filtered, strategies),
     [filtered, strategies],
   );
-  const quote = useRotatingQuote();
+  const {quote, nextQuote} = useRotatingQuote();
   const glowColor =
     stats.netPnl > 0
       ? colors.profit
@@ -109,6 +112,7 @@ export function DashboardScreen() {
         title="Dashboard"
         subtitle={quote}
         emphasizeSubtitle
+        onSubtitlePress={nextQuote}
         right={
           <Pressable
             onPress={() => navigation.navigate('Profile')}
