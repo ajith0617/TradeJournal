@@ -15,4 +15,5 @@ export const TRADING_QUOTES = [
   'No confirmation, no entry.',
   'The best trade is sometimes no trade.',
   'Stay calm. Follow the plan.',
+  'Don’t focus on the money. Focus on the process.'
 ] as const;

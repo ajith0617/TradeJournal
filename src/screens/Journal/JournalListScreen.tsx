@@ -43,6 +43,8 @@ import type {JournalStackParamList} from '../../navigation/types';
 import {useRotatingQuote} from '../../hooks/useRotatingQuote';
 
 type Filter = 'all' | 'open' | 'reviewed' | 'win' | 'loss';
+/** `date` = same take-order as All/Reviewed; P&L only after Low/High */
+type PnlSort = 'date' | 'asc' | 'desc';
 
 const FILTERS: {
   id: Filter;
@@ -113,6 +115,7 @@ export function JournalListScreen() {
   const trades = useJournalStore(s => s.trades);
   const strategies = useJournalStore(s => s.strategies);
   const [filter, setFilter] = useState<Filter>('all');
+  const [pnlSort, setPnlSort] = useState<PnlSort>('date');
 
   const initial = rangeForPreset('month');
   const [preset, setPreset] = useState<RangePreset>('month');
@@ -122,6 +125,7 @@ export function JournalListScreen() {
 
   const activeFilter = FILTERS.find(f => f.id === filter) ?? FILTERS[0];
   const isAll = filter === 'all';
+  const showPnlSort = filter === 'win' || filter === 'loss';
   const subtitle = isAll ? quote : activeFilter.heading;
 
   const headingColor = isAll
@@ -169,24 +173,40 @@ export function JournalListScreen() {
       return [];
     }
     const inRange = filterTradesByDateRange(trades, fromDate, toDate);
-    if (filter === 'open') {
-      return inRange.filter(t => t.status === 'open');
-    }
-    if (filter === 'reviewed') {
-      return inRange.filter(t => t.status === 'reviewed');
-    }
-    if (filter === 'win') {
-      return inRange.filter(t => t.status === 'reviewed' && t.pnl > 0);
-    }
-    if (filter === 'loss') {
-      return inRange.filter(t => t.status === 'reviewed' && t.pnl < 0);
-    }
-    return inRange;
-  }, [trades, filter, fromDate, toDate, rangeError]);
+    let list =
+      filter === 'open'
+        ? inRange.filter(t => t.status === 'open')
+        : filter === 'reviewed'
+          ? inRange.filter(t => t.status === 'reviewed')
+          : filter === 'win'
+            ? inRange.filter(t => t.status === 'reviewed' && t.pnl > 0)
+            : filter === 'loss'
+              ? inRange.filter(t => t.status === 'reviewed' && t.pnl < 0)
+              : inRange;
 
-  const listKey = `${filter}:${fromDate}:${toDate}`;
+    if (
+      (filter === 'win' || filter === 'loss') &&
+      (pnlSort === 'asc' || pnlSort === 'desc')
+    ) {
+      list = [...list].sort((a, b) =>
+        pnlSort === 'asc' ? a.pnl - b.pnl : b.pnl - a.pnl,
+      );
+    }
+    return list;
+  }, [trades, filter, fromDate, toDate, rangeError, pnlSort]);
+
+  const selectFilter = (next: Filter) => {
+    setFilter(next);
+    if (next === 'win' || next === 'loss') {
+      setPnlSort('date');
+    }
+  };
+
+  const listKey = `${filter}:${pnlSort}:${fromDate}:${toDate}`;
   const openTradeForm = () => navigation.navigate('TradeForm', {});
   const dateLabel = rangeButtonLabel(preset, fromDate, toDate);
+  const sortTone: FilterTone =
+    filter === 'win' ? 'profit' : filter === 'loss' ? 'loss' : 'neutral';
 
   return (
     <SafeScreen>
@@ -221,11 +241,31 @@ export function JournalListScreen() {
                 label={item.label}
                 tone={item.tone}
                 active={filter === item.id}
-                onPress={() => setFilter(item.id)}
+                onPress={() => selectFilter(item.id)}
               />
             ))}
           </ScrollView>
         </FadeSlideIn>
+
+        {showPnlSort ? (
+          <FadeSlideIn delay={60} trigger={filter}>
+            <View style={styles.sortRow}>
+              <Text style={styles.sortLabel}>P&L</Text>
+              <ContextFilterChip
+                label="Low → High"
+                tone={sortTone}
+                active={pnlSort === 'asc'}
+                onPress={() => setPnlSort('asc')}
+              />
+              <ContextFilterChip
+                label="High → Low"
+                tone={sortTone}
+                active={pnlSort === 'desc'}
+                onPress={() => setPnlSort('desc')}
+              />
+            </View>
+          </FadeSlideIn>
+        ) : null}
 
         <FlatList
           data={filtered}
@@ -381,6 +421,19 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
       gap: spacing.sm,
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.xs,
+    },
+    sortRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.sm,
+    },
+    sortLabel: {
+      ...typography.caption,
+      color: colors.textMuted,
+      fontWeight: '700',
+      marginRight: spacing.xs,
     },
     list: {
       paddingHorizontal: spacing.lg,
