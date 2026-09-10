@@ -15,12 +15,14 @@ import {useJournalStore} from '../../store/journalStore';
 import {
   radius,
   spacing,
+  useTheme,
   useThemedStyles,
   type AppTypography,
   type ColorPalette,
 } from '../../theme';
 import {conditionWeightLabel, conditionWeightMarks, type ConditionWeight} from '../../types';
 import {
+  calcPnl,
   calcPnlPercent,
   calcTradedAmount,
   calcTradeHoldDays,
@@ -35,6 +37,7 @@ import type {JournalStackParamList} from '../../navigation/types';
 type Props = NativeStackScreenProps<JournalStackParamList, 'TradeDetail'>;
 
 export function TradeDetailScreen({navigation, route}: Props) {
+  const {colors} = useTheme();
   const styles = useThemedStyles(t => createStyles(t.colors, t.typography));
   const {confirm} = useConfirm();
   const {tradeId} = route.params;
@@ -74,6 +77,9 @@ export function TradeDetailScreen({navigation, route}: Props) {
       );
   }, [trade, conditionMap]);
 
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(true);
+
   if (!trade) {
     return (
       <SafeScreen>
@@ -93,9 +99,26 @@ export function TradeDetailScreen({navigation, route}: Props) {
   const holdDays = !isOpen
     ? calcTradeHoldDays(trade.date, trade.exitDate)
     : null;
-
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(true);
+  const targetPnl =
+    trade.targetPrice != null
+      ? calcPnl(
+          trade.direction,
+          trade.quantity,
+          trade.entryPrice,
+          trade.targetPrice,
+          0,
+        )
+      : null;
+  const stopLossPnl =
+    trade.stopLoss != null
+      ? calcPnl(
+          trade.direction,
+          trade.quantity,
+          trade.entryPrice,
+          trade.stopLoss,
+          0,
+        )
+      : null;
 
   const onDelete = async () => {
     const ok = await confirm({
@@ -236,15 +259,35 @@ export function TradeDetailScreen({navigation, route}: Props) {
                 <Row
                   label="Stop loss"
                   value={
-                    trade.stopLoss != null ? formatINR(trade.stopLoss) : '—'
+                    trade.stopLoss == null
+                      ? '—'
+                      : stopLossPnl == null
+                        ? formatINR(trade.stopLoss)
+                        : `${formatINR(trade.stopLoss)} · ${formatSignedINR(stopLossPnl)}`
+                  }
+                  valueColor={
+                    stopLossPnl == null
+                      ? undefined
+                      : stopLossPnl >= 0
+                        ? colors.profit
+                        : colors.loss
                   }
                 />
                 <Row
                   label="Target"
                   value={
-                    trade.targetPrice != null
-                      ? formatINR(trade.targetPrice)
-                      : '—'
+                    trade.targetPrice == null
+                      ? '—'
+                      : targetPnl == null
+                        ? formatINR(trade.targetPrice)
+                        : `${formatINR(trade.targetPrice)} · ${formatSignedINR(targetPnl)}`
+                  }
+                  valueColor={
+                    targetPnl == null
+                      ? undefined
+                      : targetPnl >= 0
+                        ? colors.profit
+                        : colors.loss
                   }
                 />
                 {!isOpen ? (
@@ -368,7 +411,7 @@ export function TradeDetailScreen({navigation, route}: Props) {
                   <View style={styles.screenshotsBlock}>
                     <Text style={styles.notesLabel}>Screenshots</Text>
                     <Text style={styles.zoomHint}>
-                      Tap to view · Tap × to delete from Journal folder
+                      Tap to view · Delete from full-screen view
                     </Text>
                     <ScreenshotGallery
                       images={trade.images}
@@ -412,12 +455,24 @@ export function TradeDetailScreen({navigation, route}: Props) {
   );
 }
 
-function Row({label, value}: {label: string; value: string}) {
+function Row({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+}) {
   const styles = useThemedStyles(t => createStyles(t.colors, t.typography));
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
+      <Text
+        style={[styles.rowValue, valueColor ? {color: valueColor} : null]}
+        numberOfLines={2}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -549,6 +604,9 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
   rowValue: {
     ...typography.body,
     fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
+    maxWidth: '62%',
   },
   noteCard: {
     marginTop: spacing.md,

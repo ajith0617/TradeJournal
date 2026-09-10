@@ -402,7 +402,7 @@ export function TradeFormScreen({navigation, route}: Props) {
 
         <Text style={styles.sectionLabel}>Screenshots</Text>
         <Text style={styles.hintTop}>
-          Tap to view · Tap × to delete
+          Tap to view · Delete from full-screen view
         </Text>
         <ScreenshotGallery
           images={images}

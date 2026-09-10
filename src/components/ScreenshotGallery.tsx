@@ -18,7 +18,7 @@ type Props = {
   imageStyle?: StyleProp<ViewStyle>;
   /** Wrap style for the row */
   style?: StyleProp<ViewStyle>;
-  /** Remove callback (edit form) — tap × or long-press */
+  /** Remove callback — delete only from fullscreen viewer */
   onRemove?: (uri: string) => void;
   /** Extra node in the thumbnail row (e.g. add button) */
   trailing?: React.ReactNode;
@@ -69,24 +69,6 @@ export function ScreenshotGallery({
         fontSize: 10,
         fontWeight: '600',
       },
-      removeBtn: {
-        position: 'absolute',
-        top: 4,
-        right: 4,
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 2,
-      },
-      removeBtnText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '700',
-        lineHeight: 16,
-      },
       header: {
         paddingTop: 52,
         paddingHorizontal: spacing.lg,
@@ -126,30 +108,18 @@ export function ScreenshotGallery({
     <View style={style}>
       <View style={styles.row}>
         {images.map((uri, i) => (
-          <View key={`${uri}-${i}`} style={[styles.thumbWrap, imageStyle]}>
-            <Pressable
-              onPress={() => {
-                setIndex(i);
-                setVisible(true);
-              }}
-              onLongPress={onRemove ? () => onRemove(uri) : undefined}
-              style={styles.thumbFill}>
-              <TradeImage uri={uri} style={[styles.thumbFill, imageStyle]} />
-              <View style={styles.zoomHint} pointerEvents="none">
-                <Text style={styles.zoomHintText}>View</Text>
-              </View>
-            </Pressable>
-            {onRemove ? (
-              <Pressable
-                onPress={() => onRemove(uri)}
-                style={styles.removeBtn}
-                hitSlop={6}
-                accessibilityRole="button"
-                accessibilityLabel="Delete image">
-                <Text style={styles.removeBtnText}>×</Text>
-              </Pressable>
-            ) : null}
-          </View>
+          <Pressable
+            key={`${uri}-${i}`}
+            onPress={() => {
+              setIndex(i);
+              setVisible(true);
+            }}
+            style={[styles.thumbWrap, imageStyle]}>
+            <TradeImage uri={uri} style={[styles.thumbFill, imageStyle]} />
+            <View style={styles.zoomHint} pointerEvents="none">
+              <Text style={styles.zoomHintText}>View</Text>
+            </View>
+          </Pressable>
         ))}
         {trailing}
       </View>

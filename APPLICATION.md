@@ -8,12 +8,12 @@
 
 **TradeJournal** is a **local-first personal trading journal** for Android (and RN iOS-capable). Traders:
 
-1. Log a trade **at entry** (stock, segment, direction, prices, strategy conditions, emotion, screenshots).
-2. **Review on exit** (win/loss, exit price, charges, review notes) → P&amp;L is computed and stored.
-3. Track **strategies** (conditions with weights) and **pre/post market daily reminders**.
-4. View **Dashboard** stats for a date range.
-5. Sign in with a **local username/password**, optional **fingerprint lock** on cold start.
-6. Persist data in **AsyncStorage** and optionally **backup/restore** under `Download/Journal/` so data survives reinstall.
+1. Log a trade **at entry** (stock, segment, direction, **entry date**, prices, strategy conditions with marks, emotion, screenshots).
+2. **Review on exit** (win/loss, **exit date**, exit price, charges, review notes) → P&amp;L ₹ and **P&amp;L %** are computed and stored; **days held** is derived from entry → exit.
+3. Track **strategies** (conditions: **Core = 2 marks**, **Minor = 1 mark**) and **pre/post market daily reminders**.
+4. View **Dashboard** stats for a date range (net P&amp;L, %, traded amount, by strategy).
+5. Sign in with a **local username/password** (password **show/hide**), optional **fingerprint lock** on cold start.
+6. Persist data in **AsyncStorage** and **backup/restore** under `Download/Journal/` so data survives reinstall. **Start fresh** can wipe the folder backup + images (with confirm + All files access).
 
 There is **no cloud backend** in the current codebase. Auth and data stay on device.
 
@@ -26,6 +26,7 @@ There is **no cloud backend** in the current codebase. Auth and data stay on dev
 | React | `19.2.3` |
 | Node engine | `>= 22.11.0` |
 | Entry | `App.tsx` |
+| GitHub | `https://github.com/ajith0617/TradeJournal.git` (`main`) |
 
 ---
 
@@ -34,12 +35,12 @@ There is **no cloud backend** in the current codebase. Auth and data stay on dev
 ### Core
 - React Native `0.87.1`, React `19.2.3`, TypeScript
 - Zustand `^5` — global store (`src/store/journalStore.ts`)
-- date-fns `^4` — dates / ranges
+- date-fns `^4` — dates / ranges / hold days
 - uuid `^14` — IDs
 
 ### Navigation & UI shell
 - `@react-navigation/native` + `native-stack`
-- Custom **swipe tabs** in `src/navigation/RootTabs.tsx` (horizontal ScrollView pager; not relying on unrebuilt pager-view for tab switching)
+- Custom **swipe tabs** in `src/navigation/RootTabs.tsx` (horizontal ScrollView pager)
 - `react-native-screens`, `react-native-safe-area-context`
 - `@react-navigation/bottom-tabs` / `material-top-tabs` are in package.json but **primary UX uses custom RootTabs**
 
@@ -47,13 +48,16 @@ There is **no cloud backend** in the current codebase. Auth and data stay on dev
 - `@react-native-async-storage/async-storage` — app state
 - `react-native-fs` — files / folder backup / images
 - `react-native-image-picker` — pick screenshots
-- `react-native-image-viewing` — full-screen image viewer
+- `react-native-image-viewing` — full-screen image viewer (**delete image only from viewer**)
 
 ### Security
 - `react-native-biometrics` — fingerprint unlock
 
 ### Native Android
-- Custom module **`FolderAccess`** (`android/.../FolderAccessModule.kt`) — All files access for backup folder
+- Custom module **`FolderAccess`** (`android/app/src/main/java/com/journal/FolderAccessModule.kt`):
+  - `hasAllFilesAccess` / `openAllFilesAccessSettings`
+  - `wipeJournalBackup` — recursive delete of Download/Journal (and mirrors)
+  - `deleteJournalImages(names[])` — delete specific files under Journal/images
 
 ### Notable absences
 - No Firebase / remote API in active use
@@ -85,6 +89,10 @@ SafeAreaProvider
 - `appUnlocked` is **in-memory only** — resets when the process is killed; stays true while app is backgrounded (fingerprint is **cold start**, not every resume).
 - If user disables fingerprint lock, hydrate sets `appUnlocked: true` when already signed in.
 - Theme follows `profile.themeId` immediately via `ThemeProvider`.
+
+### Restore / Start fresh
+- **Restore** — requires All files access; reads `journal-data.json` + restores images.
+- **Start fresh** — danger confirm → `startFresh()` → native/JS wipe of Journal folder + local `trade-images/` → seed defaults. **Does not** dismiss restore until wipe succeeds (errors stay on screen / open settings).
 
 ---
 
@@ -127,20 +135,22 @@ Param types: `src/navigation/types.ts`.
 | Screen | File | Role |
 |--------|------|------|
 | Splash | `screens/Auth/SplashScreen.tsx` | Full-bleed brand logo fade-in while hydrating |
-| Restore | `screens/Auth/RestoreFromFolderScreen.tsx` | Restore from `Download/Journal/`; open All-files settings; or skip (`dismissRestore`) |
-| Login | `screens/Auth/LoginScreen.tsx` | Local username/password → `loginSuccess` |
-| Biometric | `screens/Auth/BiometricLockScreen.tsx` | Fingerprint prompt; password fallback; logout |
+| Restore | `screens/Auth/RestoreFromFolderScreen.tsx` | Restore from `Download/Journal/`; or **Start fresh** (wipe + confirm) |
+| Login | `screens/Auth/LoginScreen.tsx` | Local username/password + **eye toggle**; → `loginSuccess` |
+| Biometric | `screens/Auth/BiometricLockScreen.tsx` | Fingerprint; password fallback + eye toggle; logout |
 
 ### Main
 | Screen | Role |
 |--------|------|
-| **Dashboard** | Date range presets + custom dates; Net P&amp;L hero; avg win/loss; wins/losses counts; P&amp;L by strategy; rotating quote in header; profile avatar → Profile |
-| **Profile** | Change username/password; theme picker; fingerprint toggle; folder backup now; logout. Collapsible sections. No subtitle description under title. |
-| **Rules** | Collapsible **Strategies** (default open) CRUD modal; collapsible **Daily reminders** / Trade Checklist (default closed) with Pre/Post tabs + daily checkboxes |
-| **Journal list** | Filters All / Not reviewed / Reviewed / Wins / Losses; trade cards; **FAB +** bottom-right to add trade (no header +Trade button) |
-| **Trade form** | Create or edit **entry** (open trade). Strategy conditions multi-select, emotion, images |
-| **Trade detail** | View trade; Edit; Exit & review / Edit review; Delete (themed confirm) |
-| **Trade review** | Win/Loss, exit price, charges, review notes; live P&amp;L preview; saves as `status: 'reviewed'` |
+| **Dashboard** | Shared date presets (Day/Week/Month/3M + custom); Net P&amp;L ₹ + **%** + **traded amount**; avg win/loss; wins/losses; P&amp;L + % by strategy; rotating quote; profile avatar → Profile |
+| **Profile** | Username/password (eye toggles); theme picker; fingerprint; folder backup; logout. Collapsible sections |
+| **Rules** | Collapsible Strategies (default open) + CRUD modal (**Mandatory type**: Core · 2 / Minor · 1); collapsible Daily reminders (default closed) |
+| **Journal list** | Compact **date pill** in header → bottom sheet (presets + From/To); status chips All / Not reviewed / Reviewed / Wins / Losses; cards show P&amp;L ₹/%, setup mark, **hold days**; FAB + |
+| **Trade form** | Create/edit entry; **Entry date**; strategy conditions + live **Setup mark**; screenshots; `SafeScreen keyboardAvoiding` |
+| **Trade detail** | Hero P&amp;L; collapsible **Trade details**; collapsible **Notes & screenshots** (entry vs review notes styled differently); delete trade/image confirms |
+| **Trade review** | Win/Loss; **Exit date** (required, ≥ entry); exit price; charges; review notes; live P&amp;L ₹/% + traded amount |
+
+Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
 
 ---
 
@@ -153,22 +163,39 @@ Param types: `src/navigation/types.ts`.
 - `RuleType`: `'pre' | 'post'`
 - `TradeStatus`: `'open' | 'reviewed'`
 - `TradeOutcome`: `'win' | 'loss'`
-- `ConditionWeight`: `'core' | 'secondary' | 'minor'` (labels: Core / Secondary / Minor)
+- `ConditionWeight`: **`'core' | 'minor'` only** (legacy `secondary` migrates → `core`)
+  - Core = **2** marks, Minor = **1** mark (`conditionWeightMarks`, `scoreTradeConditions`)
 
 ### `Trade` (key fields)
-`id`, `date` (YYYY-MM-DD), `stockName`, `segment`, `direction`, `quantity`, `entryPrice`, `stopLoss?`, `targetPrice?`, `reasonConditionIds[]`, `strategyId?`, `emotion`, `notes`, `images[]` (filenames), `status`, `outcome?`, `exitPrice?`, `charges`, `pnl`, `reviewNotes`, `reviewedAt?`, `createdAt`, `updatedAt`
+| Field | Notes |
+|-------|--------|
+| `date` | **Entry date** YYYY-MM-DD |
+| `exitDate?` | **Exit date** YYYY-MM-DD (set on review) |
+| `reasonConditionIds[]` | Selected strategy conditions |
+| `conditionScore?` / `conditionScoreMax?` | Setup marks snapshot at save |
+| `pnl` | Net ₹ after charges |
+| `pnlPercent?` | `(pnl / (entry × qty)) × 100`, saved on review |
+| `images[]` | Portable filenames under `trade-images/` |
+| `notes` | Entry notes |
+| `reviewNotes` | After-exit notes |
+| `status` / `outcome?` / `exitPrice?` / `charges` / `reviewedAt?` | Review lifecycle |
 
 ### Other entities
 - **`Strategy`**: name, description, `conditions[]` (`id`, `text`, `weight`)
 - **`TradingRule`**: `type` pre/post, `text`, `order`
-- **`RuleCheckState`**: `{ date, completedRuleIds[] }` — daily checklist progress
-- **`UserProfile`**: `displayName`, `email`, `photoURL?`, `signedIn`, `username`, `password`, `fingerprintLockEnabled`, `themeId`
+- **`RuleCheckState`**: `{ date, completedRuleIds[] }`
+- **`UserProfile`**: includes `themeId`: `dark` \| `light` \| `ocean` \| `slate`
 - **`AppData`**: `trades`, `rules`, `strategies`, `ruleChecks`, `profile`, `lastSyncedAt?`
 
-### P&amp;L (`src/utils/format.ts` → `calcPnl`)
-Computed on review from direction, entry, exit, quantity, charges (INR formatting via `formatINR` / `formatSignedINR`).
+### Money & duration helpers (`src/utils/format.ts`)
+- `calcPnl`, `calcTradedAmount`, `calcPnlPercent`, `formatSignedPercent`
+- `calcTradeHoldDays(entry, exit)`, `formatHoldDays` → `Same day` / `1 day` / `N days`
 
-Dashboard stats (`src/utils/stats.ts`) use **reviewed** trades only for win rate / net P&amp;L (open trades do not skew rates). Open count is shown separately.
+### Stats (`src/utils/stats.ts`)
+Reviewed trades only for net P&amp;L / win rate / **netPnlPercent** / **tradedAmount**; `pnlByStrategy` includes per-strategy %.
+
+### Shared date ranges (`src/utils/dateRange.ts`)
+`DATE_RANGE_PRESETS`, `rangeForPreset`, `RangePreset` — used by **Dashboard** and **Journal list**.
 
 ---
 
@@ -180,15 +207,19 @@ Dashboard stats (`src/utils/stats.ts`) use **reviewed** trades only for win rate
 ### Ephemeral
 - `hydrated`, `appUnlocked`, `restoreAvailable`
 
-### Actions (non-exhaustive but complete for features)
-`hydrate`, `persist`, `setAppUnlocked`, `loginSuccess`, `logout`, `dismissRestore`, `restoreFromFolder`, `addTrade`, `updateTrade`, `deleteTrade`, `addRule`, `updateRule`, `deleteRule`, `toggleRuleCheck`, `addStrategy`, `updateStrategy`, `deleteStrategy`, `setProfile`, `replaceAll`
+### Actions (feature-complete)
+`hydrate`, `persist`, `setAppUnlocked`, `loginSuccess`, `logout`, `dismissRestore`, **`startFresh`**, `restoreFromFolder`, `addTrade`, `updateTrade`, **`removeTradeImage`**, `deleteTrade`, rule/strategy CRUD, `toggleRuleCheck`, `setProfile`, `replaceAll`
 
 **Persist:** debounced ~350ms → AsyncStorage + best-effort folder backup write.
+
+**Image cleanup:**
+- `removeTradeImage` / `updateTrade` (removed images) / `deleteTrade` → `deleteTradeImages` (app dir + Journal/images, native when available)
+- `startFresh` → `wipeFolderBackupAndImages` then defaults
 
 ### Defaults
 - Username `ajith` / password `123456`
 - `fingerprintLockEnabled: true`, `themeId: 'dark'`, `signedIn: false`
-- Seeded rules + one sample strategy on first data create (`src/services/storage.ts`)
+- Seeded rules + sample strategy (`storage.ts`)
 
 ---
 
@@ -196,18 +227,18 @@ Dashboard stats (`src/utils/stats.ts`) use **reviewed** trades only for win rate
 
 | File | Responsibility |
 |------|----------------|
-| `src/services/storage.ts` | AsyncStorage key `@journal/app_data_v1`; `createDefaultData`, `loadAppData`, `saveAppData`, `migrateAppData` (legacy trade/strategy shapes, image filenames) |
-| `src/services/folderBackup.ts` | Write/read `journal-data.json` + `images/` under Download/Journal; Android permissions; FolderAccess |
-| `src/services/tradeImages.ts` | Persist gallery URIs into app docs `trade-images/`; portable filenames in JSON |
-| `src/services/auth.ts` | `verifyLocalCredentials`, `buildSignedInProfile`, username/password validators |
-| `src/services/biometrics.ts` | Availability check + fingerprint prompt |
+| `src/services/storage.ts` | AsyncStorage `@journal/app_data_v1`; defaults; `migrateAppData` (weights, `pnlPercent`, `exitDate` from `reviewedAt`, image filenames) |
+| `src/services/folderBackup.ts` | Write/read backup; **`wipeFolderBackupAndImages`** (requires All files access; verifies wipe) |
+| `src/services/tradeImages.ts` | Persist / display / backup / restore; **`deleteTradeImages`**, `clearLocalTradeImages`, `clearJournalFolderImages` |
+| `src/services/auth.ts` | Credentials + username/password validators |
+| `src/services/biometrics.ts` | Fingerprint |
 
 ### Persistence locations
 | Store | Location |
 |-------|----------|
 | Primary app data | AsyncStorage `@journal/app_data_v1` |
 | Trade images (app) | `{DocumentDirectory}/trade-images/` |
-| Folder backup (user-facing) | `Download/Journal/journal-data.json` + `Download/Journal/images/` |
+| Folder backup | `Download/Journal/journal-data.json` + `Download/Journal/images/` |
 | Backup envelope | `{ version: 2, savedAt, data }` |
 
 ---
@@ -218,59 +249,74 @@ Dashboard stats (`src/utils/stats.ts`) use **reviewed** trades only for win rate
 
 | ID | Feel |
 |----|------|
-| dark | Charcoal + mint accent (original) |
-| light | Bright surfaces + green |
-| ocean | Deep navy + cyan |
-| slate | Cool gray + blue |
+| dark | Graphite surfaces + restrained emerald |
+| light | Bright surfaces + green *(unchanged)* |
+| ocean | Deep navy + cyan *(unchanged)* |
+| slate | Blue-gray dusk + terracotta accent |
 
-- Palettes: `colors.ts` (`THEMES`, `THEME_OPTIONS`, `resolveThemeId`)
-- Runtime: `ThemeContext.tsx` → `ThemeProvider`, `useTheme()`, `useThemedStyles(factory)`
-- Spacing / radius: `spacing.ts`
-- Typography factory: `createTypography(palette)` in `typography.ts`
+- Palettes: `colors.ts`; runtime: `ThemeContext` / `useTheme` / `useThemedStyles`
+- Spacing / radius: `spacing.ts`; typography: `createTypography`
 - Change theme: Profile → Appearance → `setProfile({ themeId })`
-- UI must use **`useTheme` / `useThemedStyles`**, not static colors (StyleSheets capture values at create time).
-
-Confirm dialogs, chips, FAB, StatusBar (`light-content` / `dark-content`) all follow theme.
+- Always use theme hooks — do not bake static colors into StyleSheets
 
 ---
 
 ## 10. Feature specifics
 
-### Dashboard date range
-Presets: **Day** | **Week** | **Month** | **3 Month** | optional **Custom dates**.
+### Date range (Dashboard + Journal)
+Shared helpers in `src/utils/dateRange.ts`.
 
 | Preset | Range |
 |--------|--------|
 | Day | today → today |
 | Week | last 7 days (`subDays(now, 6)` → today) |
-| Month | same calendar date 1 month ago → today (`subMonths(now, 1)`) |
-| 3 Month | same calendar date 3 months ago → today |
+| Month | `subMonths(now, 1)` → today |
+| 3 Month | `subMonths(now, 3)` → today |
 | Custom | From/To `DateField`; invalid if from > to |
 
-Default preset: **Month**. Header subtitle: **rotating trading quotes** (`useRotatingQuote` / `src/data/quotes.ts`).
+Default: **Month**.
 
-### Journal filters
+**Journal UX:** date control is a **header pill** (e.g. `Month` or `12 Aug – 9 Sep`) opening a **bottom sheet** — status chips stay as one compact row so the list keeps screen space.
+
+### Journal status filters
 | Filter | Meaning |
 |--------|---------|
-| All | All trades; header uses rotating quote |
+| All | All trades in date range; header rotating quote |
 | Not reviewed | `status === 'open'` |
 | Reviewed | `status === 'reviewed'` |
 | Wins | reviewed && `pnl > 0` |
 | Losses | reviewed && `pnl < 0` |
 
-FAB bottom-right opens `TradeForm` for a new trade.
+Cards show: status, entry date, **hold days** (reviewed), P&amp;L ₹ + %, setup mark chip, strategy, thumbs.
 
-### Rules
-- **Strategies** section: collapsible, **default open**
-- **Daily reminders**: collapsible, **default closed**; Pre-market / Post-market chips; checklist persists per calendar day
+### Strategy conditions & setup mark
+- UI label: **Mandatory type**
+- Options: **Core · 2**, **Minor · 1** (Secondary removed)
+- Trade form shows live **Setup mark** `score / max`; persisted as `conditionScore` / `conditionScoreMax`
 
-### Profile
-Collapsible: Username & password | Appearance | Security & backup. Logout uses themed confirm. No header description line.
+### Trade detail layout
+1. Status + P&amp;L hero (always visible)
+2. Collapsible **Trade details** (default **closed**) — grid + reasons
+3. Collapsible **Notes & screenshots** (default **open** if any content)
+   - Entry notes: neutral “At entry” card
+   - Review notes: win/loss tinted “After exit” card
+   - Screenshots: tap to view; **Delete only in full-screen viewer** (no thumbnail ×)
+
+### Screenshots lifecycle
+- Pick → persist to app `trade-images/` + mirror to Journal/images on backup
+- Delete (viewer) → remove from trade + disk (app + Journal/images) immediately via `removeTradeImage` / form remove
+- Delete trade → deletes all its images from disk
 
 ### Confirmations
-Do **not** use `Alert.alert` for confirms. Use `useConfirm()` from `ConfirmProvider`:
-- `confirm({ title, message, tone: 'danger', confirmLabel })` → Promise&lt;boolean&gt;
-- `notice({ title, message, tone: 'success' | 'warning' | 'danger' })` → single OK
+Do **not** use `Alert.alert`. Use `useConfirm()`:
+- `confirm({ title, message, tone, confirmLabel })` → Promise&lt;boolean&gt;
+- `notice({ title, message, tone })` → single OK
+
+Used for: delete trade/image, start fresh, logout, strategy deletes, etc.
+
+### Keyboard & password
+- `SafeScreen` supports `keyboardAvoiding` for form screens
+- `Input` prop `showVisibilityToggle` — eye icon for secure fields (Login, Biometric, Profile)
 
 ---
 
@@ -278,16 +324,17 @@ Do **not** use `Alert.alert` for confirms. Use `useConfirm()` from `ConfirmProvi
 
 | Component | Purpose |
 |-----------|---------|
-| `SafeScreen` | Safe-area padding + themed bg |
-| `ScreenHeader` | Title + animated `DynamicDescription` subtitle + optional right |
+| `SafeScreen` | Safe-area + themed bg; optional **`keyboardAvoiding`** |
+| `ScreenHeader` | Title + animated subtitle + optional right (e.g. journal date pill) |
 | `DynamicDescription` | Accent-rail animated header subtitle only |
 | `Button` | primary / secondary / ghost / danger |
-| `Input`, `FieldLabel`, `DateField`, `SegmentedControl` | Forms |
-| `TradeCard`, `TradeImage`, `ScreenshotGallery` | Journal media & cards |
+| `Input` | Forms; optional **`showVisibilityToggle`** |
+| `FieldLabel`, `DateField`, `SegmentedControl` | Forms |
+| `TradeCard`, `TradeImage`, `ScreenshotGallery` | Journal cards/media (delete from viewer only) |
 | `EmptyState` | Empty lists + CTA |
-| `ContextFilterChip` | Themed filter/preset chips |
+| `ContextFilterChip` | Filter/preset chips |
 | `FabButton` | Circular + FAB |
-| `FadeSlideIn`, `ScalePop`, `PulseGlow` | Motion helpers |
+| `FadeSlideIn`, `ScalePop`, `PulseGlow` | Motion |
 | `ConfirmModal` + `ConfirmProvider` | Themed dialogs |
 | `TabGlyph` | Tab icons |
 
@@ -313,11 +360,11 @@ Restore-from-folder sets `signedIn: false` so user must log in again after resto
 ```
 src/
 ├── animation/tokens.ts
-├── assets/ (app_icon.png, brand_logo.png)
-├── components/   (shared UI — see §11)
+├── assets/
+├── components/
 ├── data/quotes.ts
 ├── hooks/useRotatingQuote.ts
-├── navigation/   (RootTabs, stacks, types)
+├── navigation/
 ├── screens/
 │   ├── Auth/     (Splash, Restore, Login, Biometric)
 │   ├── Dashboard/
@@ -326,27 +373,28 @@ src/
 │   └── Rules/
 ├── services/     (storage, folderBackup, tradeImages, auth, biometrics)
 ├── store/journalStore.ts
-├── theme/        (colors, ThemeContext, spacing, typography)
+├── theme/
 ├── types/index.ts
-└── utils/        (format, id, stats)
+└── utils/        (format, id, stats, dateRange)
 ```
 
-Root: `App.tsx`, `package.json`, `android/`, `ios/`.
+Root: `App.tsx`, `package.json`, `APPLICATION.md`, `android/`, `ios/`.
 
 ---
 
 ## 14. Conventions for future changes
 
-1. **Local-first** — do not assume a server unless explicitly adding one.
-2. **Themes** — always `useTheme` / `useThemedStyles` for colors/typography.
+1. **Local-first** — no server unless explicitly adding one.
+2. **Themes** — always `useTheme` / `useThemedStyles`.
 3. **Confirms** — `useConfirm()`, not system `Alert`.
-4. **Images** — persist via `tradeImages` service; store filenames in trade JSON, not temporary gallery URIs.
+4. **Images** — persist via `tradeImages`; store filenames; **delete from disk** when removing from a trade; viewer-only delete UX.
 5. **Fingerprint** — cold start only; respect `fingerprintLockEnabled`.
-6. **Trade lifecycle** — entry → `open`; after review → `reviewed` with `outcome`, `exitPrice`, `charges`, `pnl`.
-7. **Dashboard stats** — reviewed trades drive P&amp;L/win rate; keep open trades out of those aggregates.
-8. **Backup** — keep AsyncStorage + folder backup in sync when changing `AppData` shape; extend `migrateAppData` for breaking changes.
-9. **Tabs** — Dashboard is home; Rules left, Journal right of Dashboard in swipe order.
-10. Prefer existing components (`Button`, `DateField`, `FabButton`, chips) over one-off UI.
+6. **Trade lifecycle** — entry (`open`, `date` = entry) → review (`reviewed`, `exitDate`, `outcome`, `exitPrice`, `charges`, `pnl`, `pnlPercent`).
+7. **Dashboard / Journal stats** — reviewed trades for P&amp;L aggregates; keep open trades out of win rate / net %.
+8. **Backup** — keep AsyncStorage + folder backup in sync; extend `migrateAppData` for shape changes; Start fresh must **verify** wipe.
+9. **Condition weights** — only `core` \| `minor`; keep scoring helpers in `types`.
+10. **Date ranges** — reuse `src/utils/dateRange.ts` (don’t duplicate presets).
+11. Prefer existing components (`Button`, `DateField`, `FabButton`, chips, `SafeScreen keyboardAvoiding`) over one-offs.
 
 ---
 
@@ -354,13 +402,13 @@ Root: `App.tsx`, `package.json`, `android/`, `ios/`.
 
 ```bash
 npm start          # Metro
-npm run android    # Run Android
-npm run ios        # Run iOS
+npm run android    # Run Android (rebuild after native FolderAccess changes)
+npm run ios
 npm run lint
 npm test
 ```
 
-Require Node `>= 22.11.0`.
+Require Node `>= 22.11.0`. Native wipe/delete image APIs need an Android rebuild after Kotlin changes.
 
 ---
 
@@ -369,17 +417,33 @@ Require Node `>= 22.11.0`.
 ```
 Cold start
   → Splash + hydrate AsyncStorage
-  → (optional) Restore from Download/Journal
-  → Login (local)
+  → (optional) Restore OR Start fresh (wipe Journal/)
+  → Login (local, show/hide password)
   → (optional) Fingerprint
   → Tabs: Rules | Dashboard* | Journal
-       Dashboard → stats + Profile
-       Journal → list/FAB → Form / Detail / Review
-       Rules → Strategies + Daily checklist
+       Dashboard → date range stats (₹, %, traded) + Profile
+       Journal → date pill + status filters → Form / Detail / Review
+       Rules → Strategies (Core/Minor marks) + Daily checklist
 ```
 
 `*` = default tab.
 
 ---
 
-*Generated as a living app map for TradeJournal. Update this file when navigation, data model, or auth flow changes.*
+## 17. Changelog (doc sync)
+
+Recent product/code updates reflected in this document:
+
+- Start fresh wipe (native) + confirm; image delete from Journal folder
+- Themes: refined dark + slate; light/ocean kept
+- Keyboard avoiding; password visibility eye
+- Strategy Mandatory type Core/Minor + setup marks on trades/list
+- P&amp;L %, traded amount (detail, review, dashboard, list)
+- Journal compact date-range sheet (shared with dashboard presets)
+- Entry date / exit date / hold days
+- Trade detail collapsible sections; differentiated entry vs review notes
+- Screenshot delete only from full-screen viewer
+
+---
+
+*Living app map for TradeJournal. Update this file when navigation, data model, auth, backup, or major UX flows change.*
