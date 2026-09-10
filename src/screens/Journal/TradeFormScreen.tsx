@@ -415,7 +415,6 @@ export function TradeFormScreen({navigation, route}: Props) {
         </Text>
         <ScreenshotGallery
           images={images}
-          imageStyle={styles.image}
           onRemove={removeImage}
           style={styles.imagesRow}
           trailing={
@@ -526,27 +525,16 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     color: colors.textMuted,
   },
   imagesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  image: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceElevated,
-  },
   addImage: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
   },
   addImageText: {
     fontSize: 28,

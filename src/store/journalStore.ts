@@ -107,7 +107,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     username: 'ajith',
     password: '123456',
     fingerprintLockEnabled: true,
-    themeId: 'dark',
+    themeId: 'ocean',
   },
   hydrated: false,
   appUnlocked: false,

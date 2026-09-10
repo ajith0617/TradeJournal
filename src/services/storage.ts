@@ -94,7 +94,7 @@ export function createDefaultData(): AppData {
       username: 'ajith',
       password: '123456',
       fingerprintLockEnabled: true,
-      themeId: 'dark',
+      themeId: 'ocean',
     },
   };
 }

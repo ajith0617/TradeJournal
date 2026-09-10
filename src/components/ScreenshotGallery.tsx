@@ -4,6 +4,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -12,21 +13,22 @@ import {TradeImage} from './TradeImage';
 import {toDisplayImageUri} from '../services/tradeImages';
 import {radius, spacing, useThemedStyles} from '../theme';
 
+const COLUMNS = 3;
+const GAP = spacing.md;
+
 type Props = {
   images: string[];
-  /** Thumbnail style for each image */
+  /** Extra style merged onto each thumb (avoid fixed width/height — gallery sizes for 3-up) */
   imageStyle?: StyleProp<ViewStyle>;
-  /** Wrap style for the row */
   style?: StyleProp<ViewStyle>;
   /** Remove callback — delete only from fullscreen viewer */
   onRemove?: (uri: string) => void;
-  /** Extra node in the thumbnail row (e.g. add button) */
+  /** Extra node in the grid (e.g. add button) — sized to match thumbs */
   trailing?: React.ReactNode;
 };
 
 /**
- * Screenshot thumbnails — tap to open full-screen viewer with pinch zoom
- * and swipe between images.
+ * Screenshot grid — 3 per row, then wraps. Tap opens full-screen viewer.
  */
 export function ScreenshotGallery({
   images,
@@ -37,32 +39,55 @@ export function ScreenshotGallery({
 }: Props) {
   const [visible, setVisible] = useState(false);
   const [index, setIndex] = useState(0);
-  const styles = useThemedStyles(({colors, typography}) =>
+  const [rowWidth, setRowWidth] = useState(0);
+
+  const cellSize =
+    rowWidth > 0 ? Math.floor((rowWidth - GAP * (COLUMNS - 1)) / COLUMNS) : 0;
+
+  const styles = useThemedStyles(({colors: c, typography}) =>
     StyleSheet.create({
-      row: {
+      grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: spacing.sm,
+        gap: GAP,
       },
-      thumbWrap: {
+      cell: {
         position: 'relative',
-        width: 96,
-        height: 96,
-        borderRadius: radius.sm,
+        borderRadius: radius.md,
         overflow: 'hidden',
+        backgroundColor: c.surfaceElevated,
+        borderWidth: 1,
+        borderColor: c.border,
       },
       thumbFill: {
         width: '100%',
         height: '100%',
       },
+      indexBadge: {
+        position: 'absolute',
+        top: 6,
+        left: 6,
+        minWidth: 20,
+        height: 20,
+        paddingHorizontal: 5,
+        borderRadius: 10,
+        backgroundColor: 'rgba(0,0,0,0.65)',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      indexBadgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700',
+      },
       zoomHint: {
         position: 'absolute',
-        right: 4,
-        bottom: 4,
-        backgroundColor: 'rgba(0,0,0,0.55)',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
+        right: 6,
+        bottom: 6,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        borderRadius: 6,
       },
       zoomHintText: {
         color: '#fff',
@@ -83,12 +108,12 @@ export function ScreenshotGallery({
       },
       close: {
         ...typography.body,
-        color: colors.accent,
+        color: c.accent,
         fontWeight: '700',
       },
       deleteHeader: {
         ...typography.body,
-        color: colors.loss,
+        color: c.loss,
         fontWeight: '700',
       },
     }),
@@ -100,28 +125,62 @@ export function ScreenshotGallery({
     [images],
   );
 
+  const onGridLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0 && Math.abs(w - rowWidth) > 1) {
+      setRowWidth(w);
+    }
+  };
+
   if (images.length === 0 && !trailing) {
     return null;
   }
 
+  const sizedTrailing =
+    trailing && cellSize > 0 && React.isValidElement(trailing)
+      ? React.cloneElement(
+          trailing as React.ReactElement<{style?: StyleProp<ViewStyle>}>,
+          {
+            style: [
+              (trailing as React.ReactElement<{style?: StyleProp<ViewStyle>}>)
+                .props.style,
+              {
+                width: cellSize,
+                height: cellSize,
+                borderRadius: radius.md,
+              },
+            ],
+          },
+        )
+      : trailing;
+
   return (
-    <View style={style}>
-      <View style={styles.row}>
-        {images.map((uri, i) => (
-          <Pressable
-            key={`${uri}-${i}`}
-            onPress={() => {
-              setIndex(i);
-              setVisible(true);
-            }}
-            style={[styles.thumbWrap, imageStyle]}>
-            <TradeImage uri={uri} style={[styles.thumbFill, imageStyle]} />
-            <View style={styles.zoomHint} pointerEvents="none">
-              <Text style={styles.zoomHintText}>View</Text>
-            </View>
-          </Pressable>
-        ))}
-        {trailing}
+    <View style={style} onLayout={onGridLayout}>
+      <View style={styles.grid}>
+        {cellSize > 0
+          ? images.map((uri, i) => (
+              <Pressable
+                key={`${uri}-${i}`}
+                onPress={() => {
+                  setIndex(i);
+                  setVisible(true);
+                }}
+                style={[
+                  styles.cell,
+                  {width: cellSize, height: cellSize},
+                  imageStyle,
+                ]}>
+                <TradeImage uri={uri} style={styles.thumbFill} />
+                <View style={styles.indexBadge} pointerEvents="none">
+                  <Text style={styles.indexBadgeText}>{i + 1}</Text>
+                </View>
+                <View style={styles.zoomHint} pointerEvents="none">
+                  <Text style={styles.zoomHintText}>View</Text>
+                </View>
+              </Pressable>
+            ))
+          : null}
+        {sizedTrailing}
       </View>
 
       {viewerImages.length > 0 ? (

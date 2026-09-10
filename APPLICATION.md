@@ -186,7 +186,7 @@ Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
 - **`Strategy`**: name, description, `conditions[]` (`id`, `text`, `weight`)
 - **`TradingRule`**: `type` pre/post, `text`, `order`
 - **`RuleCheckState`**: `{ date, completedRuleIds[] }`
-- **`UserProfile`**: includes `themeId`: `dark` \| `light` \| `ocean` \| `slate`
+- **`UserProfile`**: includes `themeId`: `light` \| `ocean` (legacy `dark`/`slate` → `ocean`)
 - **`AppData`**: `trades`, `rules`, `strategies`, `ruleChecks`, `profile`, `lastSyncedAt?` — paper and live share one `trades[]`
 
 ### Money & duration helpers (`src/utils/format.ts`)
@@ -222,7 +222,7 @@ Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
 
 ### Defaults
 - Username `ajith` / password `123456`
-- `fingerprintLockEnabled: true`, `themeId: 'dark'`, `signedIn: false`
+- `fingerprintLockEnabled: true`, `themeId: 'ocean'`, `signedIn: false`
 - Seeded rules + sample strategy (`storage.ts`)
 
 ---
@@ -249,14 +249,12 @@ Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
 
 ## 9. Theme system (`src/theme/`)
 
-**Theme IDs:** `dark` | `light` | `ocean` | `slate` (default `dark`)
+**Theme IDs:** `light` | `ocean` (default `ocean`)
 
 | ID | Feel |
 |----|------|
-| dark | Graphite surfaces + restrained emerald |
-| light | Bright surfaces + green *(unchanged)* |
-| ocean | Deep navy + cyan *(unchanged)* |
-| slate | Blue-gray dusk + terracotta accent |
+| light | Bright surfaces + ocean cyan accent |
+| ocean | Soft navy dusk + cyan |
 
 - Palettes: `colors.ts`; runtime: `ThemeContext` / `useTheme` / `useThemedStyles`
 - Spacing / radius: `spacing.ts`; typography: `createTypography`
@@ -449,7 +447,7 @@ Cold start
 Recent product/code updates reflected in this document:
 
 - Start fresh wipe (native) + confirm; image delete from Journal folder
-- Themes: refined dark + slate; light/ocean kept
+- Themes: light (ocean cyan) / ocean dusk (dark & slate removed; migrate → ocean)
 - Keyboard avoiding; password visibility eye
 - Strategy Mandatory type Core/Minor + setup marks on trades/list
 - P&amp;L %, traded amount (detail, review, dashboard, list)

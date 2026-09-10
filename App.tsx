@@ -18,7 +18,7 @@ import {useJournalStore} from './src/store/journalStore';
 import {ThemeProvider, useTheme} from './src/theme';
 import {ConfirmProvider} from './src/components/ConfirmProvider';
 
-const MIN_SPLASH_MS = 1400;
+const MIN_SPLASH_MS = 2600;
 
 function Bootstrap() {
   const hydrated = useJournalStore(s => s.hydrated);

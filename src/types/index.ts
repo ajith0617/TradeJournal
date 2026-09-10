@@ -111,8 +111,8 @@ export interface UserProfile {
   password: string;
   /** When true, fingerprint lock is required after cold start */
   fingerprintLockEnabled: boolean;
-  /** App color theme (dark | light | ocean | slate) */
-  themeId: 'dark' | 'light' | 'ocean' | 'slate';
+  /** App color theme (light | ocean). Legacy dark/slate → ocean. */
+  themeId: 'light' | 'ocean';
 }
 
 export interface AppData {

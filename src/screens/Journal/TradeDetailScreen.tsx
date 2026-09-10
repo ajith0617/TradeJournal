@@ -420,7 +420,6 @@ export function TradeDetailScreen({navigation, route}: Props) {
                     </Text>
                     <ScreenshotGallery
                       images={trade.images}
-                      imageStyle={styles.image}
                       onRemove={onRemoveImage}
                     />
                   </View>
@@ -594,7 +593,10 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     marginTop: spacing.lg,
   },
   screenshotsBlock: {
-    marginTop: spacing.sm,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
   },
   row: {
     flexDirection: 'row',
@@ -688,12 +690,6 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
   },
   reqMinor: {
     color: colors.textMuted,
-  },
-  image: {
-    width: 110,
-    height: 110,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceElevated,
   },
   reviewBtn: {
     marginTop: spacing.md,

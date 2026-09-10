@@ -234,7 +234,7 @@ export function ProfileScreen() {
   const [passwordError, setPasswordError] = useState('');
 
   const fingerprintEnabled = profile.fingerprintLockEnabled !== false;
-  const activeThemeId = (profile.themeId || 'dark') as ThemeId;
+  const activeThemeId = (profile.themeId || 'ocean') as ThemeId;
 
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const titleY = useRef(new Animated.Value(motion.distance.sm)).current;
