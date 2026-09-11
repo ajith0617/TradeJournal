@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -8,8 +8,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {SafeScreen} from '../../components/SafeScreen';
 import {ScreenHeader} from '../../components/ScreenHeader';
@@ -41,12 +43,24 @@ import {useRotatingQuote} from '../../hooks/useRotatingQuote';
 import {todayISO} from '../../utils/format';
 
 const EMPTY_CHECKED: string[] = [];
+const MENU_WIDTH = 148;
+
+type StrategyMenuAnchor = {
+  strategy: Strategy;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 export function RulesScreen() {
   const {colors} = useTheme();
   const {confirm, notice} = useConfirm();
   const styles = useThemedStyles(t => createStyles(t.colors, t.typography));
   const insets = useSafeAreaInsets();
+  const {width: windowWidth, height: windowHeight} = useWindowDimensions();
+  const moreBtnRefs = useRef<Record<string, View | null>>({});
+  const suppressMenuOpenUntil = useRef(0);
   const strategies = useJournalStore(s => s.strategies);
   const addStrategy = useJournalStore(s => s.addStrategy);
   const updateStrategy = useJournalStore(s => s.updateStrategy);
@@ -76,8 +90,75 @@ export function RulesScreen() {
 
   const [remindersOpen, setRemindersOpen] = useState(false);
   const [strategiesOpen, setStrategiesOpen] = useState(true);
+  const [expandedStrategies, setExpandedStrategies] = useState<
+    Record<string, boolean>
+  >({});
+  const [menuAnchor, setMenuAnchor] = useState<StrategyMenuAnchor | null>(
+    null,
+  );
   const [ruleTab, setRuleTab] = useState<RuleType>('pre');
   const [ruleDraft, setRuleDraft] = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      setStrategiesOpen(true);
+    }, []),
+  );
+
+  const toggleStrategyExpanded = (id: string) => {
+    setExpandedStrategies(prev => ({...prev, [id]: !prev[id]}));
+  };
+
+  const openStrategyMenu = (item: Strategy) => {
+    if (Date.now() < suppressMenuOpenUntil.current) {
+      return;
+    }
+    const node = moreBtnRefs.current[item.id];
+    if (!node) {
+      setMenuAnchor({
+        strategy: item,
+        x: windowWidth - 56,
+        y: 120,
+        width: 32,
+        height: 32,
+      });
+      return;
+    }
+    node.measureInWindow((x, y, width, height) => {
+      setMenuAnchor({strategy: item, x, y, width, height});
+    });
+  };
+
+  const closeStrategyMenu = () => {
+    // Prevent the same tap from reopening via the ⋯ underneath (Android).
+    suppressMenuOpenUntil.current = Date.now() + 400;
+    setMenuAnchor(null);
+  };
+
+  const toggleStrategyMenu = (item: Strategy) => {
+    if (menuAnchor?.strategy.id === item.id) {
+      closeStrategyMenu();
+      return;
+    }
+    openStrategyMenu(item);
+  };
+
+  const menuPosition = useMemo(() => {
+    if (!menuAnchor) {
+      return null;
+    }
+    const gap = 6;
+    const estimatedHeight = 148;
+    const left = Math.min(
+      Math.max(12, menuAnchor.x + menuAnchor.width - MENU_WIDTH),
+      windowWidth - MENU_WIDTH - 12,
+    );
+    const below = menuAnchor.y + menuAnchor.height + gap;
+    const above = menuAnchor.y - estimatedHeight - gap;
+    const top =
+      below + estimatedHeight > windowHeight - 24 && above > 24 ? above : below;
+    return {top, left, width: MENU_WIDTH};
+  }, [menuAnchor, windowHeight, windowWidth]);
 
   const reminderList = useMemo(
     () =>
@@ -183,6 +264,27 @@ export function RulesScreen() {
     }
   };
 
+  const onCopyStrategy = async (s: Strategy) => {
+    const ok = await confirm({
+      title: 'Copy strategy?',
+      message: `Create a copy of “${s.name}”?`,
+      confirmLabel: 'Copy',
+      tone: 'accent',
+    });
+    if (!ok) {
+      return;
+    }
+    addStrategy({
+      name: `${s.name} (copy)`,
+      description: s.description,
+      conditions: s.conditions.map(c => ({
+        id: createId(),
+        text: c.text,
+        weight: c.weight === 'minor' ? 'minor' : 'core',
+      })),
+    });
+  };
+
   const onAddRule = () => {
     const text = ruleDraft.trim();
     if (!text) {
@@ -219,72 +321,146 @@ export function RulesScreen() {
       />
 
       <FlatList
-        data={strategiesOpen ? strategies : []}
-        keyExtractor={item => item.id}
-        extraData={`${todayCheckedIds.join(',')}:${strategiesOpen}`}
+        data={[]}
+        keyExtractor={() => 'rules-shell'}
+        renderItem={() => null}
+        extraData={`${todayCheckedIds.join(',')}:${strategiesOpen}:${remindersOpen}:${JSON.stringify(expandedStrategies)}:${strategies.length}`}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
           <FadeSlideIn delay={40}>
-            <Pressable
-              onPress={() => setStrategiesOpen(v => !v)}
-              style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionHeaderTitle}>Strategies</Text>
-                <Text style={styles.sectionHeaderSub}>
-                  Your playbook — trade only when conditions align
-                </Text>
-              </View>
-              <Text style={styles.sectionChevron}>
-                {strategiesOpen ? '▾' : '▸'}
-              </Text>
-            </Pressable>
-          </FadeSlideIn>
-        }
-        ListEmptyComponent={
-          strategiesOpen
-            ? () => (
-                <FadeSlideIn>
-                  <EmptyState
-                    title="No strategies yet"
-                    message="Strategies are your main rules — conditions you trade by."
-                    actionLabel="Add strategy"
-                    onAction={openCreate}
-                  />
-                </FadeSlideIn>
-              )
-            : undefined
-        }
-        renderItem={({item, index}) => (
-          <FadeSlideIn delay={Math.min(index, 8) * 45}>
-            <Pressable onPress={() => openEdit(item)} style={styles.card}>
-              <View style={styles.cardTop}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                <Pressable onPress={() => onDeleteStrategy(item)}>
-                  <Text style={styles.delete}>Delete</Text>
-                </Pressable>
-              </View>
-              {item.description ? (
-                <Text style={styles.desc}>{item.description}</Text>
-              ) : null}
-              {item.conditions.map(c => (
-                <View key={c.id} style={styles.conditionRow}>
-                  <Text style={styles.condition}>· {c.text}</Text>
-                  <Text
-                    style={[styles.weightTag, weightStyle(c.weight, colors)]}>
-                    {conditionWeightLabel(c.weight)} ·{' '}
-                    {c.weight === 'core' ? '2' : '1'}
+            <View style={styles.sectionPanel}>
+              <Pressable
+                onPress={() => setStrategiesOpen(v => !v)}
+                style={styles.sectionHeaderInPanel}>
+                <View style={styles.sectionHeaderText}>
+                  <Text style={styles.sectionHeaderTitle}>Strategies</Text>
+                  <Text style={styles.sectionHeaderSub}>
+                    Your playbook — trade only when conditions align
                   </Text>
                 </View>
-              ))}
-            </Pressable>
+                <Text style={styles.sectionChevron}>
+                  {strategiesOpen ? '▾' : '▸'}
+                </Text>
+              </Pressable>
+
+              {strategiesOpen ? (
+                <View style={styles.sectionBody}>
+                  {strategies.length === 0 ? (
+                    <EmptyState
+                      title="No strategies yet"
+                      message="Strategies are your main rules — conditions you trade by."
+                      actionLabel="Add strategy"
+                      onAction={openCreate}
+                    />
+                  ) : (
+                    strategies.map((item, index) => {
+                      const expanded = !!expandedStrategies[item.id];
+                      const menuOpen = menuAnchor?.strategy.id === item.id;
+                      return (
+                        <FadeSlideIn
+                          key={item.id}
+                          delay={Math.min(index, 8) * 40}
+                          trigger={`${item.id}-${expanded}`}>
+                          <View
+                            style={[
+                              styles.card,
+                              index === strategies.length - 1 &&
+                                styles.cardLast,
+                            ]}>
+                            <View style={styles.cardTop}>
+                              <Pressable
+                                onPress={() =>
+                                  toggleStrategyExpanded(item.id)
+                                }
+                                style={styles.cardMain}
+                                accessibilityRole="button"
+                                accessibilityState={{expanded}}
+                                accessibilityLabel={`${item.name}, ${expanded ? 'collapse' : 'expand'} conditions`}>
+                                <View style={styles.cardTitleRow}>
+                                  <Text
+                                    style={styles.cardTitle}
+                                    numberOfLines={2}>
+                                    {item.name}
+                                  </Text>
+                                  <Text style={styles.cardChevron}>
+                                    {expanded ? '▾' : '▸'}
+                                  </Text>
+                                </View>
+                                {item.description ? (
+                                  <Text
+                                    style={styles.desc}
+                                    numberOfLines={expanded ? undefined : 2}>
+                                    {item.description}
+                                  </Text>
+                                ) : null}
+                              </Pressable>
+                              <View
+                                ref={node => {
+                                  moreBtnRefs.current[item.id] = node;
+                                }}
+                                collapsable={false}>
+                                <Pressable
+                                  onPress={() => toggleStrategyMenu(item)}
+                                  hitSlop={10}
+                                  style={[
+                                    styles.moreBtn,
+                                    menuOpen && styles.moreBtnActive,
+                                  ]}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Actions for ${item.name}`}>
+                                  <Text
+                                    style={[
+                                      styles.moreBtnText,
+                                      menuOpen && styles.moreBtnTextActive,
+                                    ]}>
+                                    ⋯
+                                  </Text>
+                                </Pressable>
+                              </View>
+                            </View>
+
+                            {expanded ? (
+                              <View style={styles.conditionsBlock}>
+                                {item.conditions.length === 0 ? (
+                                  <Text style={styles.emptyConditions}>
+                                    No conditions yet
+                                  </Text>
+                                ) : (
+                                  item.conditions.map(c => (
+                                    <View
+                                      key={c.id}
+                                      style={styles.conditionRow}>
+                                      <Text style={styles.condition}>
+                                        · {c.text}
+                                      </Text>
+                                      <Text
+                                        style={[
+                                          styles.weightTag,
+                                          weightStyle(c.weight, colors),
+                                        ]}>
+                                        {conditionWeightLabel(c.weight)}
+                                      </Text>
+                                    </View>
+                                  ))
+                                )}
+                              </View>
+                            ) : null}
+                          </View>
+                        </FadeSlideIn>
+                      );
+                    })
+                  )}
+                </View>
+              ) : null}
+            </View>
           </FadeSlideIn>
-        )}
+        }
         ListFooterComponent={
           <FadeSlideIn delay={120}>
-            <View style={styles.remindersBlock}>
+            <View style={[styles.sectionPanel, styles.sectionPanelSpaced]}>
               <Pressable
                 onPress={() => setRemindersOpen(v => !v)}
-                style={styles.sectionHeader}>
+                style={styles.sectionHeaderInPanel}>
                 <View style={styles.sectionHeaderText}>
                   <Text style={styles.sectionHeaderTitle}>Trade Checklist</Text>
                   <Text style={styles.sectionHeaderSub}>
@@ -297,7 +473,7 @@ export function RulesScreen() {
               </Pressable>
 
               {remindersOpen ? (
-                <View style={styles.remindersBody}>
+                <View style={styles.sectionBody}>
                   <FadeSlideIn trigger={ruleTab} delay={20}>
                     <Text
                       style={[styles.contextLine, {color: rulesHeadingColor}]}>
@@ -343,8 +519,7 @@ export function RulesScreen() {
                   {reminderList.length === 0 ? (
                     <FadeSlideIn trigger={ruleTab}>
                       <Text style={styles.empty}>
-                        No{' '}
-                        {ruleTab === 'pre' ? 'pre' : 'post'}
+                        No {ruleTab === 'pre' ? 'pre' : 'post'}
                         -market reminders yet.
                       </Text>
                     </FadeSlideIn>
@@ -391,6 +566,79 @@ export function RulesScreen() {
           </FadeSlideIn>
         }
       />
+
+      <Modal
+        visible={menuAnchor != null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeStrategyMenu}>
+        <View style={styles.menuRoot} pointerEvents="box-none">
+          <Pressable
+            style={styles.menuDismiss}
+            onPress={closeStrategyMenu}
+            accessibilityLabel="Dismiss menu"
+          />
+          {menuAnchor ? (
+            <Pressable
+              style={[
+                styles.menuToggleHit,
+                {
+                  left: menuAnchor.x - 10,
+                  top: menuAnchor.y - 10,
+                  width: menuAnchor.width + 20,
+                  height: menuAnchor.height + 20,
+                },
+              ]}
+              onPress={closeStrategyMenu}
+              accessibilityLabel="Close menu"
+            />
+          ) : null}
+          {menuAnchor && menuPosition ? (
+            <View style={[styles.popover, menuPosition]}>
+              <Pressable
+                style={({pressed}) => [
+                  styles.popoverItem,
+                  pressed && styles.popoverItemPressed,
+                ]}
+                onPress={() => {
+                  const s = menuAnchor.strategy;
+                  closeStrategyMenu();
+                  openEdit(s);
+                }}>
+                <Text style={styles.popoverLabel}>Edit</Text>
+              </Pressable>
+              <View style={styles.popoverDivider} />
+              <Pressable
+                style={({pressed}) => [
+                  styles.popoverItem,
+                  pressed && styles.popoverItemPressed,
+                ]}
+                onPress={() => {
+                  const s = menuAnchor.strategy;
+                  closeStrategyMenu();
+                  void onCopyStrategy(s);
+                }}>
+                <Text style={styles.popoverLabel}>Copy</Text>
+              </Pressable>
+              <View style={styles.popoverDivider} />
+              <Pressable
+                style={({pressed}) => [
+                  styles.popoverItem,
+                  pressed && styles.popoverItemPressed,
+                ]}
+                onPress={() => {
+                  const s = menuAnchor.strategy;
+                  closeStrategyMenu();
+                  void onDeleteStrategy(s);
+                }}>
+                <Text style={[styles.popoverLabel, styles.popoverDanger]}>
+                  Delete
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
 
       <Modal visible={open} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView
@@ -516,16 +764,22 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     paddingBottom: spacing.xxxl,
     flexGrow: 1,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  sectionPanel: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    padding: spacing.lg,
+    overflow: 'hidden',
     marginBottom: spacing.md,
+  },
+  sectionPanelSpaced: {
+    marginTop: spacing.sm,
+  },
+  sectionHeaderInPanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.lg,
   },
   sectionHeaderText: {
     flex: 1,
@@ -543,9 +797,17 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     color: colors.textDim,
     fontSize: 16,
   },
+  sectionBody: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+    backgroundColor: colors.surfaceElevated,
+  },
   contextLine: {
     ...typography.caption,
     fontWeight: '600',
+    marginTop: spacing.md,
     marginBottom: spacing.md,
     letterSpacing: 0.2,
   },
@@ -555,25 +817,119 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     borderWidth: 1,
     borderColor: colors.borderSubtle,
     padding: spacing.lg,
-    marginBottom: spacing.md,
+    marginTop: spacing.md,
+  },
+  cardLast: {
+    marginBottom: spacing.xs,
   },
   cardTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  cardMain: {
+    flex: 1,
+    paddingRight: spacing.xs,
   },
   cardTitle: {
     ...typography.subtitle,
     flex: 1,
-    paddingRight: spacing.md,
+    paddingRight: spacing.sm,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  cardChevron: {
+    color: colors.textDim,
+    fontSize: 14,
+    marginTop: 2,
+  },
+  moreBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
+  moreBtnActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentMuted,
+  },
+  moreBtnText: {
+    ...typography.subtitle,
+    color: colors.textMuted,
+    fontSize: 18,
+    lineHeight: 20,
+    marginTop: -4,
+  },
+  moreBtnTextActive: {
+    color: colors.accent,
+  },
+  conditionsBlock: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+  },
+  emptyConditions: {
+    ...typography.caption,
+    color: colors.textDim,
+  },
+  menuRoot: {
+    flex: 1,
+  },
+  menuDismiss: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  menuToggleHit: {
+    position: 'absolute',
+  },
+  popover: {
+    position: 'absolute',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  popoverItem: {
+    paddingVertical: 13,
+    paddingHorizontal: spacing.lg,
+  },
+  popoverItemPressed: {
+    backgroundColor: colors.accentMuted,
+  },
+  popoverDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderSubtle,
+    marginHorizontal: spacing.md,
+  },
+  popoverLabel: {
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  popoverDanger: {
+    color: colors.loss,
   },
   delete: {
     ...typography.caption,
     color: colors.loss,
+    fontWeight: '700',
   },
   desc: {
     ...typography.bodyMuted,
-    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
   },
   conditionRow: {
     flexDirection: 'row',
@@ -591,13 +947,6 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     fontWeight: '700',
     fontSize: 10,
     textTransform: 'uppercase',
-  },
-  remindersBlock: {
-    marginTop: spacing.md,
-  },
-  remindersBody: {
-    marginTop: spacing.md,
-    paddingBottom: spacing.lg,
   },
   tabs: {
     flexDirection: 'row',
