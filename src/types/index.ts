@@ -60,8 +60,15 @@ export interface Trade {
   exitDate?: string;
   charges: number;
   pnl: number;
-  /** How to improve */
+  /**
+   * Legacy combined review text. Prefer reviewFollowNotes / reviewAvoidNotes.
+   * Kept for older data and synced on save.
+   */
   reviewNotes: string;
+  /** After exit — good habits / what to keep following */
+  reviewFollowNotes?: string;
+  /** After exit — mistakes / what not to follow */
+  reviewAvoidNotes?: string;
   reviewedAt?: string;
   /**
    * Paper / practice trade — isolated from live journal filters and Dashboard.

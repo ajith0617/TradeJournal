@@ -273,6 +273,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       pnl: input.pnl ?? 0,
       pnlPercent: input.pnlPercent,
       reviewNotes: input.reviewNotes ?? '',
+      reviewFollowNotes: input.reviewFollowNotes ?? '',
+      reviewAvoidNotes: input.reviewAvoidNotes ?? '',
       reviewedAt: input.reviewedAt,
       isPaper: Boolean(input.isPaper),
       createdAt: now,

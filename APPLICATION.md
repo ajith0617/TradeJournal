@@ -145,11 +145,11 @@ Param types: `src/navigation/types.ts`.
 |--------|------|
 | **Dashboard** | Shared date presets (Day/Week/Month/3M + custom); Net P&amp;L ₹ + **%** + **traded amount** (**live trades only**); avg win/loss; wins/losses; P&amp;L + % by strategy; **tap rotating quote** for next; profile avatar → Profile |
 | **Profile** | Username/password (eye toggles); theme picker; fingerprint; folder backup; logout. Collapsible sections |
-| **Rules** | Collapsible Strategies (default open) + CRUD modal (**Mandatory type**: Core · 2 / Minor · 1); collapsible Daily reminders (default closed); **tap quote** for next |
+| **Rules** | Collapsible Strategies panel (opens by default when tab focused) — tap strategy to expand conditions; **⋯** popover for Edit / Copy / Delete; CRUD modal (**Mandatory type**: Core · 2 / Minor · 1); collapsible Trade Checklist (default closed); **tap quote** for next |
 | **Journal list** | Compact **date pill** + muted **Paper** entry (header); live chips All / Not reviewed / Reviewed / Wins / Losses; Wins/Losses optional **P&amp;L Low→High / High→Low** (default take-order); **Paper trade** mode via header (isolated list, ← Live journal to exit); FAB + |
 | **Trade form** | Create/edit entry; **Entry date**; strategy conditions + live **Setup mark**; screenshots; paper mode title when `isPaper` |
-| **Trade detail** | Hero P&amp;L; collapsible **Trade details** (SL/Target show ₹ risk/reward on same line); collapsible **Notes & screenshots**; paper badge in status |
-| **Trade review** | Win/Loss; **Exit date** (required, ≥ entry); exit price; charges; review notes; live P&amp;L ₹/% + traded amount |
+| **Trade detail** | Hero P&amp;L; collapsible **Trade details** (SL/Target show ₹ risk/reward on same line); collapsible **Notes & screenshots** with separate **What to follow** / **What not to follow** after exit; paper badge in status |
+| **Trade review** | Win/Loss; **Exit date** (required, ≥ entry); exit price; charges; two lesson cards — **What to follow (good)** and **What not to follow (bad)**; live P&amp;L ₹/% + traded amount |
 
 Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
 
@@ -178,7 +178,9 @@ Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
 | `pnlPercent?` | `(pnl / (entry × qty)) × 100`, saved on review |
 | `images[]` | Portable filenames under `trade-images/` |
 | `notes` | Entry notes |
-| `reviewNotes` | After-exit notes |
+| `reviewFollowNotes?` | After exit — **what to follow** (good habits) |
+| `reviewAvoidNotes?` | After exit — **what not to follow** (mistakes) |
+| `reviewNotes` | Legacy combined after-exit text; migrated into follow when split fields missing; kept in sync on review save |
 | `status` / `outcome?` / `exitPrice?` / `charges` / `reviewedAt?` | Review lifecycle |
 | `isPaper?` | `true` = **paper / practice** trade; omitted/`false` = live. Migrated via `Boolean(isPaper)` |
 
@@ -311,7 +313,7 @@ Paper trades **never** appear in these chips.
 2. Collapsible **Trade details** (default **closed**) — grid + reasons; **Stop loss / Target** show price · potential ₹ (green/red)
 3. Collapsible **Notes & screenshots** (default **open** if any content)
    - Entry notes: neutral “At entry” card
-   - Review notes: win/loss tinted “After exit” card
+   - After exit: two separate cards — teal **What to follow (Good things)** and red **What not to follow (Bad things)**
    - Screenshots: tap to view; **Delete only in full-screen viewer** (no thumbnail ×)
 
 ### Screenshots lifecycle
@@ -435,7 +437,7 @@ Cold start
   → Tabs: Rules | Dashboard* | Journal
        Dashboard → date range stats (₹, %, traded; live only) + tap quote + Profile
        Journal → date pill + Paper (header) + live filters / paper mode → Form / Detail / Review
-       Rules → Strategies (Core/Minor marks) + Daily checklist + tap quote
+       Rules → Strategies (expand conditions; ⋯ Edit/Copy/Delete) + Trade Checklist + tap quote
 ```
 
 `*` = default tab.
@@ -459,6 +461,8 @@ Recent product/code updates reflected in this document:
 - Wins/Losses optional P&amp;L sort (default take-order)
 - Tap rotating quote to advance
 - **Paper trade** (`isPaper`) — header entry, isolated list, excluded from Dashboard/live filters
+- Rules strategies: expand on tap, ⋯ popover actions (Edit/Copy/Delete), section opens on tab focus
+- After-exit review split into **What to follow** / **What not to follow** (`reviewFollowNotes` / `reviewAvoidNotes`)
 
 ---
 

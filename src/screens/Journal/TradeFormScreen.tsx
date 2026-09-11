@@ -199,6 +199,8 @@ export function TradeFormScreen({navigation, route}: Props) {
       charges: existing?.charges ?? 0,
       pnl: existing?.status === 'reviewed' ? existing.pnl : 0,
       reviewNotes: existing?.reviewNotes ?? '',
+      reviewFollowNotes: existing?.reviewFollowNotes ?? '',
+      reviewAvoidNotes: existing?.reviewAvoidNotes ?? '',
       exitPrice: existing?.exitPrice,
       outcome: existing?.outcome,
       reviewedAt: existing?.reviewedAt,

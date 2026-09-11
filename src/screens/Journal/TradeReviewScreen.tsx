@@ -65,7 +65,12 @@ export function TradeReviewScreen({navigation, route}: Props) {
   const [charges, setCharges] = useState(
     trade?.charges ? String(trade.charges) : '',
   );
-  const [reviewNotes, setReviewNotes] = useState(trade?.reviewNotes ?? '');
+  const [reviewFollowNotes, setReviewFollowNotes] = useState(
+    trade?.reviewFollowNotes ?? trade?.reviewNotes ?? '',
+  );
+  const [reviewAvoidNotes, setReviewAvoidNotes] = useState(
+    trade?.reviewAvoidNotes ?? '',
+  );
 
   const exitRequired = trade
     ? isExitPriceRequired(trade.stopLoss, trade.targetPrice)
@@ -167,6 +172,8 @@ export function TradeReviewScreen({navigation, route}: Props) {
       trade.entryPrice,
       trade.quantity,
     );
+    const follow = reviewFollowNotes.trim();
+    const avoid = reviewAvoidNotes.trim();
     updateTrade(trade.id, {
       outcome,
       exitPrice: preview.exit,
@@ -174,7 +181,9 @@ export function TradeReviewScreen({navigation, route}: Props) {
       charges: ch,
       pnl: preview.pnl,
       pnlPercent: pct ?? undefined,
-      reviewNotes: reviewNotes.trim(),
+      reviewFollowNotes: follow,
+      reviewAvoidNotes: avoid,
+      reviewNotes: [follow, avoid].filter(Boolean).join('\n\n'),
       status: 'reviewed',
       reviewedAt: new Date().toISOString(),
     });
@@ -311,18 +320,48 @@ export function TradeReviewScreen({navigation, route}: Props) {
           placeholder="0"
         />
 
-        <Input
-          label="Review notes"
-          value={reviewNotes}
-          onChangeText={setReviewNotes}
-          placeholder={
-            outcome === 'loss'
-              ? 'What will you improve after this loss?'
-              : 'What worked? What to keep doing?'
-          }
-          multiline
-          style={{minHeight: 120, textAlignVertical: 'top'}}
-        />
+        <Text style={styles.reviewSectionTitle}>After exit — lessons</Text>
+        <Text style={styles.reviewSectionSub}>
+          Split what worked from what to avoid so the next trade is clearer
+        </Text>
+
+        <View style={[styles.lessonCard, styles.lessonCardFollow]}>
+          <Text style={[styles.lessonEyebrow, styles.lessonEyebrowFollow]}>
+            What to follow
+          </Text>
+          <Text style={[styles.lessonTitle, styles.lessonTitleFollow]}>
+            Good things
+          </Text>
+          <Text style={styles.lessonHint}>
+            Habits and decisions you want to keep doing
+          </Text>
+          <Input
+            value={reviewFollowNotes}
+            onChangeText={setReviewFollowNotes}
+            placeholder="e.g. Waited for confirmation · Sized risk correctly"
+            multiline
+            style={styles.lessonInput}
+          />
+        </View>
+
+        <View style={[styles.lessonCard, styles.lessonCardAvoid]}>
+          <Text style={[styles.lessonEyebrow, styles.lessonEyebrowAvoid]}>
+            What not to follow
+          </Text>
+          <Text style={[styles.lessonTitle, styles.lessonTitleAvoid]}>
+            Bad things
+          </Text>
+          <Text style={styles.lessonHint}>
+            Mistakes and patterns to skip next time
+          </Text>
+          <Input
+            value={reviewAvoidNotes}
+            onChangeText={setReviewAvoidNotes}
+            placeholder="e.g. Moved stop early · Chased after FOMO"
+            multiline
+            style={styles.lessonInput}
+          />
+        </View>
 
         <Button
           title="Complete review"
@@ -430,6 +469,68 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     ...typography.subtitle,
     fontSize: 18,
     marginTop: spacing.xs,
+  },
+  reviewSectionTitle: {
+    ...typography.subtitle,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  reviewSectionSub: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginBottom: spacing.lg,
+  },
+  lessonCard: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  lessonCardFollow: {
+    backgroundColor: 'rgba(13, 148, 136, 0.08)',
+    borderColor: colors.borderSubtle,
+    borderLeftColor: colors.profit,
+  },
+  lessonCardAvoid: {
+    backgroundColor: colors.lossMuted,
+    borderColor: colors.borderSubtle,
+    borderLeftColor: colors.loss,
+  },
+  lessonEyebrow: {
+    ...typography.caption,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  lessonEyebrowFollow: {
+    color: colors.profit,
+  },
+  lessonEyebrowAvoid: {
+    color: colors.loss,
+  },
+  lessonTitle: {
+    ...typography.subtitle,
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  lessonTitleFollow: {
+    color: colors.profit,
+  },
+  lessonTitleAvoid: {
+    color: colors.loss,
+  },
+  lessonHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  lessonInput: {
+    minHeight: 96,
+    textAlignVertical: 'top' as const,
+    marginBottom: 0,
   },
   save: {
     marginTop: spacing.lg,

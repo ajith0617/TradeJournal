@@ -199,6 +199,25 @@ function migrateAppData(data: AppData): AppData {
             ) ?? undefined
           : undefined),
       reviewNotes: anyT.reviewNotes ?? '',
+      reviewFollowNotes: (() => {
+        const anyReview = anyT as Trade & {
+          reviewFollowNotes?: string;
+          reviewAvoidNotes?: string;
+        };
+        if (typeof anyReview.reviewFollowNotes === 'string') {
+          return anyReview.reviewFollowNotes;
+        }
+        // Older trades only had reviewNotes — treat as “what to follow”
+        if (typeof anyReview.reviewAvoidNotes !== 'string') {
+          return anyT.reviewNotes ?? '';
+        }
+        return '';
+      })(),
+      reviewAvoidNotes:
+        typeof (anyT as {reviewAvoidNotes?: string}).reviewAvoidNotes ===
+        'string'
+          ? (anyT as {reviewAvoidNotes: string}).reviewAvoidNotes
+          : '',
       images: (anyT.images ?? []).map((img: string) => tradeImageFileName(img)),
       notes: anyT.notes ?? '',
       emotion: anyT.emotion ?? 'Neutral',

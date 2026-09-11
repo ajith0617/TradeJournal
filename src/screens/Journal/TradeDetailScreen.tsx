@@ -359,7 +359,10 @@ export function TradeDetailScreen({navigation, route}: Props) {
         </View>
 
         {trade.notes ||
-        (!isOpen && trade.reviewNotes) ||
+        (!isOpen &&
+          (trade.reviewFollowNotes ||
+            trade.reviewAvoidNotes ||
+            trade.reviewNotes)) ||
         trade.images.length > 0 ? (
           <View style={styles.collapseBlock}>
             <Pressable
@@ -382,33 +385,43 @@ export function TradeDetailScreen({navigation, route}: Props) {
                   </View>
                 ) : null}
 
-                {!isOpen && trade.reviewNotes ? (
-                  <View
-                    style={[
-                      styles.noteCard,
-                      positive
-                        ? styles.reviewNoteCardWin
-                        : styles.reviewNoteCardLoss,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.noteEyebrow,
-                        positive
-                          ? styles.reviewNoteEyebrowWin
-                          : styles.reviewNoteEyebrowLoss,
-                      ]}>
-                      After exit
-                    </Text>
-                    <Text
-                      style={[
-                        styles.notesLabel,
-                        positive
-                          ? styles.reviewNoteLabelWin
-                          : styles.reviewNoteLabelLoss,
-                      ]}>
-                      Review notes
-                    </Text>
-                    <Text style={styles.notes}>{trade.reviewNotes}</Text>
+                {!isOpen &&
+                (trade.reviewFollowNotes ||
+                  trade.reviewAvoidNotes ||
+                  trade.reviewNotes) ? (
+                  <View style={styles.afterExitBlock}>
+                    <Text style={styles.afterExitHeading}>After exit</Text>
+
+                    {trade.reviewFollowNotes ||
+                    (!trade.reviewAvoidNotes && trade.reviewNotes) ? (
+                      <View style={[styles.noteCard, styles.followNoteCard]}>
+                        <Text
+                          style={[styles.noteEyebrow, styles.followNoteEyebrow]}>
+                          What to follow
+                        </Text>
+                        <Text
+                          style={[styles.notesLabel, styles.followNoteLabel]}>
+                          Good things
+                        </Text>
+                        <Text style={styles.notes}>
+                          {trade.reviewFollowNotes || trade.reviewNotes}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {trade.reviewAvoidNotes ? (
+                      <View style={[styles.noteCard, styles.avoidNoteCard]}>
+                        <Text
+                          style={[styles.noteEyebrow, styles.avoidNoteEyebrow]}>
+                          What not to follow
+                        </Text>
+                        <Text
+                          style={[styles.notesLabel, styles.avoidNoteLabel]}>
+                          Bad things
+                        </Text>
+                        <Text style={styles.notes}>{trade.reviewAvoidNotes}</Text>
+                      </View>
+                    ) : null}
                   </View>
                 ) : null}
 
@@ -628,12 +641,24 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     borderColor: colors.borderSubtle,
     borderLeftColor: colors.textDim,
   },
-  reviewNoteCardWin: {
-    backgroundColor: colors.accentMuted,
+  afterExitBlock: {
+    marginTop: spacing.sm,
+  },
+  afterExitHeading: {
+    ...typography.caption,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: colors.textDim,
+    marginBottom: spacing.xs,
+  },
+  followNoteCard: {
+    backgroundColor: 'rgba(13, 148, 136, 0.08)',
     borderColor: colors.borderSubtle,
     borderLeftColor: colors.profit,
   },
-  reviewNoteCardLoss: {
+  avoidNoteCard: {
     backgroundColor: colors.lossMuted,
     borderColor: colors.borderSubtle,
     borderLeftColor: colors.loss,
@@ -647,10 +672,10 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     color: colors.textDim,
     marginBottom: 2,
   },
-  reviewNoteEyebrowWin: {
+  followNoteEyebrow: {
     color: colors.profit,
   },
-  reviewNoteEyebrowLoss: {
+  avoidNoteEyebrow: {
     color: colors.loss,
   },
   notesLabel: {
@@ -660,10 +685,10 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
   entryNoteLabel: {
     color: colors.textMuted,
   },
-  reviewNoteLabelWin: {
+  followNoteLabel: {
     color: colors.profit,
   },
-  reviewNoteLabelLoss: {
+  avoidNoteLabel: {
     color: colors.loss,
   },
   zoomHint: {
