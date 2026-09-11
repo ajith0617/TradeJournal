@@ -148,7 +148,7 @@ Param types: `src/navigation/types.ts`.
 |--------|------|
 | **Dashboard** | Shared date presets (Day/Week/Month/3M + custom); Net P&amp;L ₹ + **%** + **traded amount** (**live trades only**); avg win/loss; wins/losses; P&amp;L + % by strategy; **tap rotating quote** for next; profile avatar → Profile |
 | Profile | Username/password (eye toggles); theme picker; fingerprint; **Backup now** / **Restore from folder**; logout |
-| **Rules** | Collapsible Strategies panel (opens by default when tab focused) — tap strategy to expand conditions; **⋯** popover for Edit / Copy / Delete; CRUD modal (**Mandatory type**: Core · 2 / Minor · 1); collapsible Trade Checklist (default closed); **tap quote** for next |
+| **Rules** | Collapsible Strategies panel (opens by default when tab focused) — tap strategy to expand conditions; **⋯** popover for Edit / Copy / Delete; CRUD modal (**Mandatory type**: Core · 2 / Minor · 1; **↑ ↓** to reorder conditions); collapsible Trade Checklist (default closed); **tap quote** for next |
 | **Journal list** | Compact **date pill** + muted **Paper** entry (header); live chips All / Not reviewed / Reviewed / Wins / Losses; Wins/Losses optional **P&amp;L Low→High / High→Low** (default take-order); **Paper trade** mode via header (isolated list, ← Live journal to exit); FAB + |
 | **Trade form** | Create/edit entry; **Entry date**; strategy conditions + live **Setup mark**; screenshots; paper mode title when `isPaper` |
 | **Trade detail** | Hero P&amp;L; collapsible **Trade details** (SL/Target show ₹ risk/reward on same line); collapsible **Notes & screenshots** with separate **What to follow** / **What not to follow** after exit; paper badge in status |
@@ -306,6 +306,7 @@ Paper trades **never** appear in these chips.
 ### Strategy conditions & setup mark
 - UI label: **Mandatory type**
 - Options: **Core · 2**, **Minor · 1** (Secondary removed)
+- New/Edit strategy modal: **↑ ↓** reorder conditions; order is saved with the strategy
 - Trade form shows live **Setup mark** `score / max`; persisted as `conditionScore` / `conditionScoreMax`
 
 ### Rotating quotes
@@ -440,7 +441,7 @@ Cold start
        Dashboard → date range stats (₹, %, traded; live only) + tap quote + Profile
          Profile → Backup now / Restore from folder (JSON + images)
        Journal → date pill + Paper (header) + live filters / paper mode → Form / Detail / Review
-       Rules → Strategies (expand conditions; ⋯ Edit/Copy/Delete) + Trade Checklist + tap quote
+       Rules → Strategies (expand conditions; ⋯ Edit/Copy/Delete; ↑↓ reorder in modal) + Trade Checklist + tap quote
 ```
 
 `*` = default tab.
@@ -464,7 +465,7 @@ Recent product/code updates reflected in this document:
 - Wins/Losses optional P&amp;L sort (default take-order)
 - Tap rotating quote to advance
 - **Paper trade** (`isPaper`) — header entry, isolated list, excluded from Dashboard/live filters
-- Rules strategies: expand on tap, ⋯ popover actions (Edit/Copy/Delete), section opens on tab focus
+- Rules strategies: expand on tap, ⋯ popover actions (Edit/Copy/Delete), section opens on tab focus; New/Edit strategy **↑ ↓** condition reorder
 - After-exit review split into **What to follow** / **What not to follow** (`reviewFollowNotes` / `reviewAvoidNotes`)
 - Restore is **Profile-only** (no launch restore screen); path **`Documents/Journal/`**; **Backup now** is the only folder write (full JSON + image sync, including removals); no live folder backup
 

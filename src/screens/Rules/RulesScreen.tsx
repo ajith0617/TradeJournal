@@ -229,6 +229,23 @@ export function RulesScreen() {
     setConditions(prev => prev.filter(c => c.id !== id));
   };
 
+  const moveCondition = (id: string, direction: -1 | 1) => {
+    setConditions(prev => {
+      const index = prev.findIndex(c => c.id === id);
+      if (index < 0) {
+        return prev;
+      }
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= prev.length) {
+        return prev;
+      }
+      const next = [...prev];
+      const [item] = next.splice(index, 1);
+      next.splice(nextIndex, 0, item);
+      return next;
+    });
+  };
+
   const onSaveStrategy = async () => {
     if (!name.trim()) {
       await notice({
@@ -682,8 +699,48 @@ export function RulesScreen() {
               />
 
               <Text style={styles.section}>Conditions</Text>
-              {conditions.map(c => (
+              {conditions.map((c, index) => (
                 <View key={c.id} style={styles.condRow}>
+                  <View style={styles.condReorder}>
+                    <Pressable
+                      onPress={() => moveCondition(c.id, -1)}
+                      disabled={index === 0}
+                      hitSlop={8}
+                      style={[
+                        styles.reorderBtn,
+                        index === 0 && styles.reorderBtnDisabled,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Move condition up">
+                      <Text
+                        style={[
+                          styles.reorderBtnText,
+                          index === 0 && styles.reorderBtnTextDisabled,
+                        ]}>
+                        ↑
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => moveCondition(c.id, 1)}
+                      disabled={index === conditions.length - 1}
+                      hitSlop={8}
+                      style={[
+                        styles.reorderBtn,
+                        index === conditions.length - 1 &&
+                          styles.reorderBtnDisabled,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Move condition down">
+                      <Text
+                        style={[
+                          styles.reorderBtnText,
+                          index === conditions.length - 1 &&
+                            styles.reorderBtnTextDisabled,
+                        ]}>
+                        ↓
+                      </Text>
+                    </Pressable>
+                  </View>
                   <View style={styles.condLeft}>
                     <Text style={styles.condText}>{c.text}</Text>
                     <Pressable onPress={() => cycleWeight(c.id)}>
@@ -1054,10 +1111,40 @@ function createStyles(colors: ColorPalette, typography: AppTypography) {
     paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderSubtle,
+    gap: spacing.sm,
+  },
+  condReorder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingTop: 2,
+  },
+  reorderBtn: {
+    width: 28,
+    height: 24,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
+  reorderBtnDisabled: {
+    opacity: 0.35,
+  },
+  reorderBtnText: {
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 12,
+    lineHeight: 14,
+  },
+  reorderBtnTextDisabled: {
+    color: colors.textDim,
   },
   condLeft: {
     flex: 1,
-    paddingRight: spacing.md,
+    paddingRight: spacing.sm,
     gap: 4,
   },
   condText: {
