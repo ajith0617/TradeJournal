@@ -12,7 +12,6 @@ import {
 import {RootTabs} from './src/navigation/RootTabs';
 import {LoginScreen} from './src/screens/Auth/LoginScreen';
 import {BiometricLockScreen} from './src/screens/Auth/BiometricLockScreen';
-import {RestoreFromFolderScreen} from './src/screens/Auth/RestoreFromFolderScreen';
 import {SplashScreen} from './src/screens/Auth/SplashScreen';
 import {useJournalStore} from './src/store/journalStore';
 import {ThemeProvider, useTheme} from './src/theme';
@@ -22,7 +21,6 @@ const MIN_SPLASH_MS = 2600;
 
 function Bootstrap() {
   const hydrated = useJournalStore(s => s.hydrated);
-  const restoreAvailable = useJournalStore(s => s.restoreAvailable);
   const signedIn = useJournalStore(s => s.profile.signedIn);
   const fingerprintLockEnabled = useJournalStore(
     s => s.profile.fingerprintLockEnabled !== false,
@@ -61,10 +59,6 @@ function Bootstrap() {
   // Fingerprint only after cold start when lock is enabled.
   if (!hydrated || !splashDone) {
     return <SplashScreen />;
-  }
-
-  if (restoreAvailable) {
-    return <RestoreFromFolderScreen />;
   }
 
   if (!signedIn) {

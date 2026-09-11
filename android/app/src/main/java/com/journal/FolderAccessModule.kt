@@ -31,6 +31,53 @@ class FolderAccessModule(
     }
   }
 
+  /**
+   * Find public journal-data.json under Documents/Journal (canonical)
+   * or Download/Journal (legacy). Prefers Documents when both exist.
+   */
+  @ReactMethod
+  fun findJournalBackup(promise: Promise) {
+    try {
+      val documents = linkedSetOf<File>()
+      val downloads = linkedSetOf<File>()
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+          ?.let { documents.add(File(File(it, "Journal"), "journal-data.json")) }
+      }
+      Environment.getExternalStorageDirectory()?.let { root ->
+        documents.add(File(root, "Documents/Journal/journal-data.json"))
+      }
+
+      Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        ?.let { downloads.add(File(File(it, "Journal"), "journal-data.json")) }
+      Environment.getExternalStorageDirectory()?.let { root ->
+        downloads.add(File(root, "Download/Journal/journal-data.json"))
+      }
+
+      fun bestOf(files: Set<File>): File? {
+        var best: File? = null
+        for (file in files) {
+          if (file.exists() && file.isFile && file.length() > 2) {
+            if (best == null || file.length() > best!!.length()) {
+              best = file
+            }
+          }
+        }
+        return best
+      }
+
+      val docsBest = bestOf(documents)
+      if (docsBest != null) {
+        promise.resolve(docsBest.absolutePath)
+        return
+      }
+      promise.resolve(bestOf(downloads)?.absolutePath)
+    } catch (e: Exception) {
+      promise.reject("FIND_BACKUP_ERROR", e.message, e)
+    }
+  }
+
   @ReactMethod
   fun openAllFilesAccessSettings(promise: Promise) {
     try {
@@ -87,17 +134,17 @@ class FolderAccessModule(
       }
 
       val imageDirs = linkedSetOf<File>()
-      Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        ?.let { imageDirs.add(File(File(it, "Journal"), "images")) }
-
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
           ?.let { imageDirs.add(File(File(it, "Journal"), "images")) }
       }
 
+      Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        ?.let { imageDirs.add(File(File(it, "Journal"), "images")) }
+
       Environment.getExternalStorageDirectory()?.let { root ->
-        imageDirs.add(File(root, "Download/Journal/images"))
         imageDirs.add(File(root, "Documents/Journal/images"))
+        imageDirs.add(File(root, "Download/Journal/images"))
       }
 
       reactContext.getExternalFilesDir(null)?.let { appExt ->
@@ -127,7 +174,7 @@ class FolderAccessModule(
   }
 
   /**
-   * Recursively delete Download/Journal (and other Journal backup roots).
+   * Recursively delete Documents/Journal (and other Journal backup roots).
    * Requires All files access on Android 11+.
    */
   @ReactMethod
@@ -138,24 +185,24 @@ class FolderAccessModule(
       ) {
         promise.reject(
           "NO_ACCESS",
-          "Need All files access to delete Download/Journal backup",
+          "Need All files access to delete Documents/Journal backup",
         )
         return
       }
 
       val targets = linkedSetOf<File>()
 
-      Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        ?.let { targets.add(File(it, "Journal")) }
-
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
           ?.let { targets.add(File(it, "Journal")) }
       }
 
+      Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        ?.let { targets.add(File(it, "Journal")) }
+
       Environment.getExternalStorageDirectory()?.let { root ->
-        targets.add(File(root, "Download/Journal"))
         targets.add(File(root, "Documents/Journal"))
+        targets.add(File(root, "Download/Journal"))
       }
 
       reactContext.getExternalFilesDir(null)?.let { appExt ->
@@ -172,10 +219,14 @@ class FolderAccessModule(
         }
       }
 
-      // Verify public Download/Journal is gone (primary backup location)
+      // Verify public Documents/Journal is gone (primary backup location)
       val primary =
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-          ?.let { File(it, "Journal") }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+          Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            ?.let { File(it, "Journal") }
+        } else {
+          Environment.getExternalStorageDirectory()?.let { File(it, "Documents/Journal") }
+        }
       if (primary != null && primary.exists()) {
         failed.add(primary.absolutePath)
       }

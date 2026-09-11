@@ -14,7 +14,7 @@
 4. Track **strategies** (conditions: **Core = 2 marks**, **Minor = 1 mark**) and **pre/post market daily reminders**.
 5. View **Dashboard** stats for a date range (net P&amp;L, %, traded amount, by strategy) — **live trades only**.
 6. Sign in with a **local username/password** (password **show/hide**), optional **fingerprint lock** on cold start.
-7. Persist data in **AsyncStorage** and **backup/restore** under `Download/Journal/` so data survives reinstall. **Start fresh** can wipe the folder backup + images (with confirm + All files access).
+7. Persist data in **AsyncStorage**. **Manual** backup/restore under `Documents/Journal/` via Profile (Backup now / Restore from folder). No live folder sync.
 
 There is **no cloud backend** in the current codebase. Auth and data stay on device.
 
@@ -57,7 +57,7 @@ There is **no cloud backend** in the current codebase. Auth and data stay on dev
 ### Native Android
 - Custom module **`FolderAccess`** (`android/app/src/main/java/com/journal/FolderAccessModule.kt`):
   - `hasAllFilesAccess` / `openAllFilesAccessSettings`
-  - `wipeJournalBackup` — recursive delete of Download/Journal (and mirrors)
+  - `wipeJournalBackup` — recursive delete of Documents/Journal (and mirrors)
   - `deleteJournalImages(names[])` — delete specific files under Journal/images
 
 ### Notable absences
@@ -80,20 +80,24 @@ SafeAreaProvider
 
 **Bootstrap order (exclusive gates):**
 
-1. **Splash** — until `hydrate()` finishes **and** min **1400ms** splash (`SplashScreen`)
-2. **Restore** — if `restoreAvailable` (fresh install + folder backup found) → `RestoreFromFolderScreen`
-3. **Login** — if `!profile.signedIn` → `LoginScreen`
-4. **Fingerprint** — if `!appUnlocked && fingerprintLockEnabled !== false` → `BiometricLockScreen`
-5. Else → `NavigationContainer` + `RootTabs`
+1. **Splash** — until `hydrate()` finishes **and** min splash (`SplashScreen`)
+2. **Login** — if `!profile.signedIn` → `LoginScreen`
+3. **Fingerprint** — if `!appUnlocked && fingerprintLockEnabled !== false` → `BiometricLockScreen`
+4. Else → `NavigationContainer` + `RootTabs`
 
 **Important behaviors:**
 - `appUnlocked` is **in-memory only** — resets when the process is killed; stays true while app is backgrounded (fingerprint is **cold start**, not every resume).
 - If user disables fingerprint lock, hydrate sets `appUnlocked: true` when already signed in.
 - Theme follows `profile.themeId` immediately via `ThemeProvider`.
 
-### Restore / Start fresh
-- **Restore** — requires All files access; reads `journal-data.json` + restores images.
-- **Start fresh** — danger confirm → `startFresh()` → native/JS wipe of Journal folder + local `trade-images/` → seed defaults. **Does not** dismiss restore until wipe succeeds (errors stay on screen / open settings).
+### Restore from Profile (not at login)
+- After install → login → **Profile → Security & backup → Restore from folder**
+- Requires All files access; reads `Documents/Journal/journal-data.json` (+ images/) and restores screenshots into the app. Download/Journal is a legacy fallback only.
+- Keeps the current login session; replaces trades / rules / strategies in the app
+
+### Backup now (Profile only — no live sync)
+- **Profile → Backup now** writes `Documents/Journal/journal-data.json` and syncs `images/` to match the app (copies current screenshots, deletes orphans).
+- Day-to-day saves update **AsyncStorage only**; the Journal folder is not live-synced.
 
 ---
 
@@ -136,7 +140,6 @@ Param types: `src/navigation/types.ts`.
 | Screen | File | Role |
 |--------|------|------|
 | Splash | `screens/Auth/SplashScreen.tsx` | Full-bleed brand logo fade-in while hydrating |
-| Restore | `screens/Auth/RestoreFromFolderScreen.tsx` | Restore from `Download/Journal/`; or **Start fresh** (wipe + confirm) |
 | Login | `screens/Auth/LoginScreen.tsx` | Local username/password + **eye toggle**; → `loginSuccess` |
 | Biometric | `screens/Auth/BiometricLockScreen.tsx` | Fingerprint; password fallback + eye toggle; logout |
 
@@ -144,7 +147,7 @@ Param types: `src/navigation/types.ts`.
 | Screen | Role |
 |--------|------|
 | **Dashboard** | Shared date presets (Day/Week/Month/3M + custom); Net P&amp;L ₹ + **%** + **traded amount** (**live trades only**); avg win/loss; wins/losses; P&amp;L + % by strategy; **tap rotating quote** for next; profile avatar → Profile |
-| **Profile** | Username/password (eye toggles); theme picker; fingerprint; folder backup; logout. Collapsible sections |
+| Profile | Username/password (eye toggles); theme picker; fingerprint; **Backup now** / **Restore from folder**; logout |
 | **Rules** | Collapsible Strategies panel (opens by default when tab focused) — tap strategy to expand conditions; **⋯** popover for Edit / Copy / Delete; CRUD modal (**Mandatory type**: Core · 2 / Minor · 1); collapsible Trade Checklist (default closed); **tap quote** for next |
 | **Journal list** | Compact **date pill** + muted **Paper** entry (header); live chips All / Not reviewed / Reviewed / Wins / Losses; Wins/Losses optional **P&amp;L Low→High / High→Low** (default take-order); **Paper trade** mode via header (isolated list, ← Live journal to exit); FAB + |
 | **Trade form** | Create/edit entry; **Entry date**; strategy conditions + live **Setup mark**; screenshots; paper mode title when `isPaper` |
@@ -214,9 +217,9 @@ Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
 - `hydrated`, `appUnlocked`, `restoreAvailable`
 
 ### Actions (feature-complete)
-`hydrate`, `persist`, `setAppUnlocked`, `loginSuccess`, `logout`, `dismissRestore`, **`startFresh`**, `restoreFromFolder`, `addTrade`, `updateTrade`, **`removeTradeImage`**, `deleteTrade`, rule/strategy CRUD, `toggleRuleCheck`, `setProfile`, `replaceAll`
+`hydrate`, `persist`, `setAppUnlocked`, `loginSuccess`, `logout`, `dismissRestore`, **`startFresh`**, `restoreFromFolder`, **`restoreFromFolderManual`**, `addTrade`, `updateTrade`, **`removeTradeImage`**, `deleteTrade`, rule/strategy CRUD, `toggleRuleCheck`, `setProfile`, `replaceAll`
 
-**Persist:** debounced ~350ms → AsyncStorage + best-effort folder backup write.
+**Persist:** debounced ~350ms → AsyncStorage only (folder backup is manual via Profile).
 
 **Image cleanup:**
 - `removeTradeImage` / `updateTrade` (removed images) / `deleteTrade` → `deleteTradeImages` (app dir + Journal/images, native when available)
@@ -244,7 +247,7 @@ Forms (trade / review / strategy modal / profile) use **keyboard avoiding**.
 |-------|----------|
 | Primary app data | AsyncStorage `@journal/app_data_v1` |
 | Trade images (app) | `{DocumentDirectory}/trade-images/` |
-| Folder backup | `Download/Journal/journal-data.json` + `Download/Journal/images/` |
+| Folder backup | `Documents/Journal/journal-data.json` + `Documents/Journal/images/` |
 | Backup envelope | `{ version: 2, savedAt, data }` |
 
 ---
@@ -365,7 +368,7 @@ Motion tokens: `src/animation/tokens.ts`.
 | Display name after login | `Ajith` |
 | Email shape | `{username}@local` |
 
-Restore-from-folder sets `signedIn: false` so user must log in again after restore.
+Restore from Profile keeps the current session and loads trades + screenshots into the app.
 
 ---
 
@@ -380,7 +383,7 @@ src/
 ├── hooks/useRotatingQuote.ts
 ├── navigation/
 ├── screens/
-│   ├── Auth/     (Splash, Restore, Login, Biometric)
+│   ├── Auth/     (Splash, Login, Biometric)
 │   ├── Dashboard/
 │   ├── Journal/  (List, Form, Detail, Review)
 │   ├── Profile/
@@ -405,7 +408,7 @@ Root: `App.tsx`, `package.json`, `APPLICATION.md`, `android/`, `ios/`.
 5. **Fingerprint** — cold start only; respect `fingerprintLockEnabled`.
 6. **Trade lifecycle** — entry (`open`, `date` = entry) → review (`reviewed`, `exitDate`, `outcome`, `exitPrice`, `charges`, `pnl`, `pnlPercent`).
 7. **Dashboard / Journal stats** — reviewed trades for P&amp;L aggregates; keep open trades out of win rate / net %.
-8. **Backup** — keep AsyncStorage + folder backup in sync; extend `migrateAppData` for shape changes; Start fresh must **verify** wipe.
+8. **Backup** — Profile **Backup now** / **Restore from folder** for `Documents/Journal/`; extend `migrateAppData` for shape changes.
 9. **Condition weights** — only `core` \| `minor`; keep scoring helpers in `types`.
 10. **Date ranges** — reuse `src/utils/dateRange.ts` (don’t duplicate presets).
 11. Prefer existing components (`Button`, `DateField`, `FabButton`, chips, `SafeScreen keyboardAvoiding`) over one-offs.
@@ -431,11 +434,11 @@ Require Node `>= 22.11.0`. Native wipe/delete image APIs need an Android rebuild
 ```
 Cold start
   → Splash + hydrate AsyncStorage
-  → (optional) Restore OR Start fresh (wipe Journal/)
   → Login (local, show/hide password)
   → (optional) Fingerprint
   → Tabs: Rules | Dashboard* | Journal
        Dashboard → date range stats (₹, %, traded; live only) + tap quote + Profile
+         Profile → Backup now / Restore from folder (JSON + images)
        Journal → date pill + Paper (header) + live filters / paper mode → Form / Detail / Review
        Rules → Strategies (expand conditions; ⋯ Edit/Copy/Delete) + Trade Checklist + tap quote
 ```
@@ -463,6 +466,7 @@ Recent product/code updates reflected in this document:
 - **Paper trade** (`isPaper`) — header entry, isolated list, excluded from Dashboard/live filters
 - Rules strategies: expand on tap, ⋯ popover actions (Edit/Copy/Delete), section opens on tab focus
 - After-exit review split into **What to follow** / **What not to follow** (`reviewFollowNotes` / `reviewAvoidNotes`)
+- Restore is **Profile-only** (no launch restore screen); path **`Documents/Journal/`**; **Backup now** is the only folder write (full JSON + image sync, including removals); no live folder backup
 
 ---
 

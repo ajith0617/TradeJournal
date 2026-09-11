@@ -159,7 +159,7 @@ export function TradeFormScreen({navigation, route}: Props) {
     const name = tradeImageFileName(uri);
     setImages(prev => prev.filter(i => tradeImageFileName(i) !== name));
 
-    // Instantly remove from app storage + Download/Journal/images
+    // Instantly remove from app storage + Documents/Journal/images
     if (existing) {
       removeTradeImage(existing.id, name);
     } else {

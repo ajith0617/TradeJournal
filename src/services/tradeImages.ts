@@ -1,13 +1,6 @@
-import {NativeModules} from 'react-native';
 import RNFS from 'react-native-fs';
 
 export const TRADE_IMAGE_DIR = `${RNFS.DocumentDirectoryPath}/trade-images`;
-
-type FolderAccessNative = {
-  deleteJournalImages?: (names: string[]) => Promise<number>;
-};
-
-const FolderAccess = NativeModules.FolderAccess as FolderAccessNative | undefined;
 
 async function ensureImageDir(): Promise<void> {
   if (!(await RNFS.exists(TRADE_IMAGE_DIR))) {
@@ -143,8 +136,8 @@ export async function persistTradeImages(
   return out;
 }
 
-/** Copy all trade images into Journal/images next to the JSON backup. */
-export async function backupTradeImagesToFolder(
+/** Copy current trade images into Journal/images and remove orphans. */
+export async function syncTradeImagesToFolder(
   journalDir: string,
   imageRefs: string[],
 ): Promise<void> {
@@ -153,26 +146,52 @@ export async function backupTradeImagesToFolder(
     await RNFS.mkdir(destDir);
   }
 
-  const unique = [...new Set(imageRefs.filter(Boolean))];
-  for (const ref of unique) {
-    const name = tradeImageFileName(ref);
-    if (!name) {
-      continue;
-    }
-    const src = tradeImageFsPath(ref);
+  const keep = new Set(
+    [...new Set(imageRefs.filter(Boolean))]
+      .map(ref => tradeImageFileName(ref))
+      .filter(Boolean),
+  );
+
+  // Copy / refresh files that should exist
+  for (const name of keep) {
+    const src = tradeImageFsPath(name);
     const dest = `${destDir}/${name}`;
     try {
       if (!(await RNFS.exists(src))) {
         continue;
       }
+      // Always overwrite so folder matches app storage
       if (await RNFS.exists(dest)) {
-        continue;
+        await unlinkQuiet(dest);
       }
       await RNFS.copyFile(src, dest);
     } catch {
       // skip individual image failures
     }
   }
+
+  // Delete images removed from the app
+  try {
+    const entries = await RNFS.readDir(destDir);
+    for (const entry of entries) {
+      if (!entry.isFile()) {
+        continue;
+      }
+      if (!keep.has(entry.name)) {
+        await unlinkQuiet(entry.path);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/** @deprecated Use syncTradeImagesToFolder — kept for call sites that only copy */
+export async function backupTradeImagesToFolder(
+  journalDir: string,
+  imageRefs: string[],
+): Promise<void> {
+  await syncTradeImagesToFolder(journalDir, imageRefs);
 }
 
 /**
@@ -227,16 +246,18 @@ async function unlinkQuiet(path: string): Promise<void> {
   }
 }
 
-/** Candidate Journal folder roots (Download/Journal, etc.). */
+/** Candidate Journal folder roots. Documents/Journal is canonical. */
 export function candidateJournalDirs(): string[] {
   const dirs: string[] = [];
+  const root = RNFS.ExternalStorageDirectoryPath;
+  if (root) {
+    dirs.push(`${root}/Documents/Journal`);
+  }
   if (RNFS.DownloadDirectoryPath) {
     dirs.push(`${RNFS.DownloadDirectoryPath}/Journal`);
   }
-  const root = RNFS.ExternalStorageDirectoryPath;
   if (root) {
     dirs.push(`${root}/Download/Journal`);
-    dirs.push(`${root}/Documents/Journal`);
   }
   if (RNFS.ExternalDirectoryPath) {
     dirs.push(`${RNFS.ExternalDirectoryPath}/Journal`);
@@ -244,7 +265,7 @@ export function candidateJournalDirs(): string[] {
   return [...new Set(dirs)];
 }
 
-/** Delete image files from app storage and Journal/images mirrors. */
+/** Delete image files from app storage only. Journal/images updates on Backup now. */
 export async function deleteTradeImages(refs: string[]): Promise<void> {
   const names = [
     ...new Set(
@@ -255,25 +276,8 @@ export async function deleteTradeImages(refs: string[]): Promise<void> {
     return;
   }
 
-  // App-private copies
   for (const name of names) {
     await unlinkQuiet(`${TRADE_IMAGE_DIR}/${name}`);
-  }
-
-  // Native delete into Download/Journal/images (reliable with storage access)
-  if (FolderAccess?.deleteJournalImages) {
-    try {
-      await FolderAccess.deleteJournalImages(names);
-    } catch {
-      // fall through to RNFS
-    }
-  }
-
-  // JS fallback for all candidate Journal folders
-  for (const dir of candidateJournalDirs()) {
-    for (const name of names) {
-      await unlinkQuiet(`${dir}/images/${name}`);
-    }
   }
 }
 

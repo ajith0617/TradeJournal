@@ -13,7 +13,7 @@ import {createId} from '../utils/id';
 import {todayISO} from '../utils/format';
 import {deleteTradeImages, tradeImageFileName} from '../services/tradeImages';
 import {createDefaultData, loadAppData, saveAppData} from '../services/storage';
-import {writeFolderBackup, wipeFolderBackupAndImages} from '../services/folderBackup';
+import {wipeFolderBackupAndImages} from '../services/folderBackup';
 import {resolveThemeId} from '../theme';
 
 type TradeInput = Omit<Trade, 'id' | 'createdAt' | 'updatedAt'>;
@@ -26,7 +26,7 @@ interface JournalState extends AppData {
   hydrated: boolean;
   /** In-memory only — resets on process kill; stays true while app is backgrounded */
   appUnlocked: boolean;
-  /** Fresh install and Documents/Journal backup was found */
+  /** @deprecated Cold-start restore gate removed — restore is Profile-only */
   restoreAvailable: boolean;
   hydrate: () => Promise<void>;
   persist: () => Promise<void>;
@@ -37,6 +37,12 @@ interface JournalState extends AppData {
   /** Wipe folder backup + images and seed a clean local journal. */
   startFresh: () => Promise<void>;
   restoreFromFolder: (data: AppData) => Promise<void>;
+  /** Profile: load Documents/Journal JSON + images; keep current session */
+  restoreFromFolderManual: () => Promise<{
+    tradeCount: number;
+    strategyCount: number;
+    ruleCount: number;
+  }>;
 
   addTrade: (input: Omit<TradeInput, 'pnl' | 'status' | 'charges' | 'reviewNotes'> & Partial<TradeInput>) => void;
   updateTrade: (id: string, input: Partial<Trade>) => void;
@@ -58,6 +64,7 @@ interface JournalState extends AppData {
 }
 
 async function persistSlice(get: () => JournalState) {
+  const state = get();
   const {
     trades,
     rules,
@@ -65,7 +72,7 @@ async function persistSlice(get: () => JournalState) {
     ruleChecks,
     profile,
     lastSyncedAt,
-  } = get();
+  } = state;
   const payload = {
     trades,
     rules,
@@ -74,13 +81,8 @@ async function persistSlice(get: () => JournalState) {
     profile,
     lastSyncedAt,
   };
+  // Local AsyncStorage only — Documents/Journal updates on Profile → Backup now
   await saveAppData(payload);
-  // Mirror to Documents/Journal so data can survive uninstall
-  try {
-    await writeFolderBackup(payload);
-  } catch {
-    // Local AsyncStorage still saved; folder backup may need permission
-  }
 }
 
 /** Debounce disk writes so checklist toggles stay instant (stringify can be heavy). */
@@ -128,18 +130,10 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       ),
     };
 
-    let restoreAvailable = false;
+    // Restore is Profile-only — always seed local store on fresh install.
+    // Folder backup is manual (Profile → Backup now) and will not auto-overwrite.
     if (freshInstall) {
-      try {
-        const {folderBackupExists} = await import('../services/folderBackup');
-        restoreAvailable = await folderBackupExists();
-      } catch {
-        restoreAvailable = false;
-      }
-      if (!restoreAvailable) {
-        // No folder backup — seed local defaults now
-        await saveAppData({...data, profile});
-      }
+      await saveAppData({...data, profile});
     }
 
     const skipLock =
@@ -150,7 +144,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       profile,
       hydrated: true,
       appUnlocked: skipLock,
-      restoreAvailable,
+      restoreAvailable: false,
     });
   },
 
@@ -192,17 +186,21 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   dismissRestore: async () => {
-    const state = get();
-    const data = {
-      trades: state.trades,
-      rules: state.rules,
-      strategies: state.strategies,
-      ruleChecks: state.ruleChecks,
-      profile: state.profile,
-      lastSyncedAt: state.lastSyncedAt,
+    // Seed empty local journal only — never mirror to Documents/Journal here.
+    const defaults = createDefaultData();
+    const profile = {
+      ...defaults.profile,
+      ...get().profile,
+      signedIn: false,
     };
-    await saveAppData(data);
-    set({restoreAvailable: false});
+    const next = {...defaults, profile};
+    await saveAppData(next);
+    set({
+      ...next,
+      restoreAvailable: false,
+      hydrated: true,
+      appUnlocked: false,
+    });
   },
 
   startFresh: async () => {
@@ -219,32 +217,51 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   restoreFromFolder: async data => {
+    const current = get().profile;
+    const keepSession = Boolean(current.signedIn);
     const migratedProfile = {
-      displayName: data.profile?.displayName ?? '',
-      email: data.profile?.email ?? '',
-      photoURL: data.profile?.photoURL,
-      signedIn: false, // require login again after reinstall
-      username: data.profile?.username?.trim() || 'ajith',
-      password: data.profile?.password || '123456',
+      displayName: data.profile?.displayName || current.displayName || '',
+      email: data.profile?.email || current.email || '',
+      photoURL: data.profile?.photoURL || current.photoURL,
+      signedIn: keepSession,
+      username:
+        (keepSession ? current.username : data.profile?.username)?.trim() ||
+        'ajith',
+      password:
+        (keepSession ? current.password : data.profile?.password) || '123456',
       fingerprintLockEnabled:
+        current.fingerprintLockEnabled !== false &&
         data.profile?.fingerprintLockEnabled !== false,
       themeId: normalizeProfileThemeId(
-        (data.profile as {themeId?: string} | undefined)?.themeId,
+        data.profile?.themeId ?? current.themeId,
       ),
     };
     const next = {
       ...data,
+      trades: data.trades ?? [],
+      rules: data.rules ?? [],
+      strategies: data.strategies ?? [],
+      ruleChecks: data.ruleChecks ?? [],
       profile: migratedProfile,
     };
     await saveAppData(next);
-    // Advance UI first — don't block on folder rewrite (permissions can hang)
     set({
       ...next,
       restoreAvailable: false,
       hydrated: true,
-      appUnlocked: false,
+      appUnlocked: keepSession ? true : false,
     });
-    void writeFolderBackup(next).catch(() => {});
+  },
+
+  restoreFromFolderManual: async () => {
+    const {readFolderBackup} = await import('../services/folderBackup');
+    const data = await readFolderBackup();
+    await get().restoreFromFolder(data);
+    return {
+      tradeCount: data.trades?.length ?? 0,
+      strategyCount: data.strategies?.length ?? 0,
+      ruleCount: data.rules?.length ?? 0,
+    };
   },
 
   addTrade: input => {

@@ -22,6 +22,8 @@ import {
 } from '../../services/auth';
 import {
   describeBackupLocation,
+  hasAllFilesAccess,
+  openAllFilesAccessSettings,
   writeFolderBackup,
 } from '../../services/folderBackup';
 import {
@@ -218,6 +220,9 @@ export function ProfileScreen() {
   const profile = useJournalStore(s => s.profile);
   const setProfile = useJournalStore(s => s.setProfile);
   const setAppUnlocked = useJournalStore(s => s.setAppUnlocked);
+  const restoreFromFolderManual = useJournalStore(
+    s => s.restoreFromFolderManual,
+  );
   const logout = useJournalStore(s => s.logout);
   const [busy, setBusy] = useState(false);
 
@@ -335,10 +340,10 @@ export function ProfileScreen() {
         profile: state.profile,
         lastSyncedAt: state.lastSyncedAt,
       };
-      await writeFolderBackup(payload);
+      await writeFolderBackup(payload, {force: true});
       await notice({
         title: 'Backup saved',
-        message: `Saved to ${describeBackupLocation()}journal-data.json`,
+        message: `Updated ${describeBackupLocation()}journal-data.json and images/ to match the app (including removals).`,
         tone: 'success',
       });
     } catch (e) {
@@ -348,6 +353,53 @@ export function ProfileScreen() {
           e instanceof Error
             ? e.message
             : 'Allow All files access and try again.',
+        tone: 'danger',
+        confirmLabel: 'OK',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onFolderRestore = async () => {
+    const ok = await confirm({
+      title: 'Restore from Journal folder?',
+      message:
+        'Loads trades, rules, strategies, and screenshots from Documents/Journal/journal-data.json into the app. Current journal data in the app will be replaced.',
+      confirmLabel: 'Restore',
+      tone: 'accent',
+    });
+    if (!ok) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const allowed = await hasAllFilesAccess();
+      if (!allowed) {
+        await openAllFilesAccessSettings();
+        await notice({
+          title: 'Enable All files access',
+          message:
+            'Turn on All files access for TradeJournal, then tap Restore again.',
+          tone: 'warning',
+          confirmLabel: 'OK',
+        });
+        return;
+      }
+      const {tradeCount, strategyCount, ruleCount} =
+        await restoreFromFolderManual();
+      await notice({
+        title: 'Restored',
+        message: `Loaded ${tradeCount} trade${tradeCount === 1 ? '' : 's'}, ${strategyCount} strateg${strategyCount === 1 ? 'y' : 'ies'}, ${ruleCount} rule${ruleCount === 1 ? '' : 's'} (with screenshots) from ${describeBackupLocation()}`,
+        tone: 'success',
+      });
+    } catch (e) {
+      await notice({
+        title: 'Restore failed',
+        message:
+          e instanceof Error
+            ? e.message
+            : 'Could not read journal-data.json.',
         tone: 'danger',
         confirmLabel: 'OK',
       });
@@ -601,6 +653,13 @@ export function ProfileScreen() {
                       variant="secondary"
                       onPress={onFolderBackup}
                       disabled={busy}
+                    />
+                    <Button
+                      title={busy ? 'Working…' : 'Restore from folder'}
+                      variant="secondary"
+                      onPress={onFolderRestore}
+                      disabled={busy}
+                      style={{marginTop: spacing.sm}}
                     />
                   </View>
                 </View>
